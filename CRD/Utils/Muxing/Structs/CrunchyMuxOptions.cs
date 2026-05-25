@@ -15,11 +15,13 @@ public class CrunchyMuxOptions{
     public bool MuxFonts{ get; set; }
     public bool MuxCover{ get; set; }
     public bool MuxDescription{ get; set; }
+    public bool ReplaceExistingFiles{ get; set; }
     public string ForceMuxer{ get; set; }
     public bool NoCleanup{ get; set; }
     public string VideoTitle{ get; set; }
     public List<string> FfmpegOptions{ get; set; } = [];
     public List<string> MkvmergeOptions{ get; set; } = [];
+    public LanguageItem? DefaultVideo{ get; set; }
     public LanguageItem? DefaultSub{ get; set; }
     public LanguageItem? DefaultAudio{ get; set; }
     public string CcTag{ get; set; }

@@ -15,6 +15,7 @@
         <ui:UiEmptyToDefaultConverter x:Key="EmptyToDefault" />
         <ui:UiListHasElementsConverter x:Key="UiListHasElementsConverter" />
         <ui:UiEnumToBoolConverter x:Key="EnumToBoolConverter" />
+        <ui:UiHistoryDownloadStatusConverter x:Key="UiHistoryDownloadStatusConverter" />
     </UserControl.Resources>
 
 
@@ -235,7 +236,7 @@
                                                                                         <ColumnDefinition Width="*" />
                                                                                         <ColumnDefinition Width="Auto" />
                                                                                     </Grid.ColumnDefinitions>
-                                                                                    <TextBlock HorizontalAlignment="Center" Text="{Binding SelectedSeries.SelectedVideoQualityItem.stringValue, FallbackValue=''}"
+                                                                                    <TextBlock HorizontalAlignment="Center" Text="{Binding SelectedSeries.SelectedVideoQualityItem, FallbackValue=''}"
                                                                                                VerticalAlignment="Center" />
                                                                                     <Path Grid.Column="1" Data="M 0,1 L 4,4 L 8,1" Stroke="White" StrokeThickness="1"
                                                                                           VerticalAlignment="Center" Margin="5,0,5,0" Stretch="Uniform" Width="8" />
@@ -247,16 +248,10 @@
                                                                                Placement="Bottom"
                                                                                PlacementTarget="{Binding ElementName=OverrideDropdownButtonQuality}">
                                                                             <Border BorderThickness="1" Background="{DynamicResource ComboBoxDropDownBackground}">
-                                                                                <ListBox x:Name="ListBoxQulitiesSelection" SelectionMode="Single,Toggle" Width="210"
+                                                                                    <ListBox x:Name="ListBoxQulitiesSelection" SelectionMode="Single,Toggle" Width="210"
                                                                                          MaxHeight="400"
                                                                                          ItemsSource="{Binding SelectedSeries.VideoQualityList , Mode=OneWay}"
-                                                                                         SelectedItem="{Binding SelectedSeries.SelectedVideoQualityItem}">
-                                                                                    <ListBox.ItemTemplate>
-                                                                                        <DataTemplate DataType="{x:Type structs:StringItem}">
-                                                                                            <TextBlock Text="{Binding stringValue}"></TextBlock>
-                                                                                        </DataTemplate>
-                                                                                    </ListBox.ItemTemplate>
-                                                                                </ListBox>
+                                                                                         SelectedItem="{Binding SelectedSeries.SelectedVideoQualityItem}" />
                                                                             </Border>
                                                                         </Popup>
                                                                     </StackPanel>
@@ -289,13 +284,7 @@
                                                                                 <ListBox x:Name="ListBoxDubsSelection" SelectionMode="Multiple,Toggle" Width="210"
                                                                                          MaxHeight="400"
                                                                                          ItemsSource="{Binding SelectedSeries.DubLangList , Mode=OneWay}"
-                                                                                         SelectedItems="{Binding SelectedSeries.SelectedDubLang}">
-                                                                                    <ListBox.ItemTemplate>
-                                                                                        <DataTemplate DataType="{x:Type structs:StringItem}">
-                                                                                            <TextBlock Text="{Binding stringValue}"></TextBlock>
-                                                                                        </DataTemplate>
-                                                                                    </ListBox.ItemTemplate>
-                                                                                </ListBox>
+                                                                                         SelectedItems="{Binding SelectedSeries.SelectedDubLang}" />
                                                                             </Border>
                                                                         </Popup>
                                                                     </StackPanel>
@@ -325,13 +314,7 @@
                                                                                 <ListBox SelectionMode="Multiple,Toggle" Width="210"
                                                                                          MaxHeight="400"
                                                                                          ItemsSource="{Binding SelectedSeries.SubLangList , Mode=OneWay}"
-                                                                                         SelectedItems="{Binding SelectedSeries.SelectedSubLang}">
-                                                                                    <ListBox.ItemTemplate>
-                                                                                        <DataTemplate DataType="{x:Type structs:StringItem}">
-                                                                                            <TextBlock Text="{Binding stringValue}"></TextBlock>
-                                                                                        </DataTemplate>
-                                                                                    </ListBox.ItemTemplate>
-                                                                                </ListBox>
+                                                                                         SelectedItems="{Binding SelectedSeries.SelectedSubLang}" />
                                                                             </Border>
                                                                         </Popup>
                                                                     </StackPanel>
@@ -543,9 +526,46 @@
                                                             Command="{Binding $parent[controls:SettingsExpander].((history:HistorySeason)DataContext).UpdateDownloaded}"
                                                             CommandParameter="{Binding EpisodeId}">
                                                         <Grid>
-                                                            <Ellipse Width="25" Height="25" Fill="#21a556" />
+                                                            <Ellipse Width="25" Height="25">
+                                                                <Ellipse.Fill>
+                                                                    <MultiBinding Converter="{StaticResource UiHistoryDownloadStatusConverter}">
+                                                                        <Binding Path="." />
+                                                                        <Binding Path="$parent[UserControl].((vm:SeriesPageViewModel)DataContext).SelectedSeries" />
+                                                                        <Binding Path="$parent[controls:SettingsExpander].((history:HistorySeason)DataContext)" />
+                                                                        <Binding Path="WasDownloaded" />
+                                                                        <Binding Path="DownloadedDubLang" />
+                                                                        <Binding Path="DownloadedSoftSubs" />
+                                                                        <Binding Path="HistoryEpisodeAvailableDubLang" />
+                                                                        <Binding Path="HistoryEpisodeAvailableSoftSubs" />
+                                                                        <Binding Path="$parent[UserControl].((vm:SeriesPageViewModel)DataContext).SelectedSeries.SelectedDubs" />
+                                                                        <Binding Path="$parent[UserControl].((vm:SeriesPageViewModel)DataContext).SelectedSeries.SelectedSubs" />
+                                                                        <Binding Path="$parent[controls:SettingsExpander].((history:HistorySeason)DataContext).SelectedDubs" />
+                                                                        <Binding Path="$parent[controls:SettingsExpander].((history:HistorySeason)DataContext).SelectedSubs" />
+                                                                    </MultiBinding>
+                                                                </Ellipse.Fill>
+                                                            </Ellipse>
                                                             <controls:SymbolIcon Symbol="Checkmark" FontSize="18" />
                                                         </Grid>
+                                                        <ToolTip.Tip>
+                                                            <TextBlock FontSize="15">
+                                                                <TextBlock.Text>
+                                                                    <MultiBinding Converter="{StaticResource UiHistoryDownloadStatusConverter}" ConverterParameter="Tooltip">
+                                                                        <Binding Path="." />
+                                                                        <Binding Path="$parent[UserControl].((vm:SeriesPageViewModel)DataContext).SelectedSeries" />
+                                                                        <Binding Path="$parent[controls:SettingsExpander].((history:HistorySeason)DataContext)" />
+                                                                        <Binding Path="WasDownloaded" />
+                                                                        <Binding Path="DownloadedDubLang" />
+                                                                        <Binding Path="DownloadedSoftSubs" />
+                                                                        <Binding Path="HistoryEpisodeAvailableDubLang" />
+                                                                        <Binding Path="HistoryEpisodeAvailableSoftSubs" />
+                                                                        <Binding Path="$parent[UserControl].((vm:SeriesPageViewModel)DataContext).SelectedSeries.SelectedDubs" />
+                                                                        <Binding Path="$parent[UserControl].((vm:SeriesPageViewModel)DataContext).SelectedSeries.SelectedSubs" />
+                                                                        <Binding Path="$parent[controls:SettingsExpander].((history:HistorySeason)DataContext).SelectedDubs" />
+                                                                        <Binding Path="$parent[controls:SettingsExpander].((history:HistorySeason)DataContext).SelectedSubs" />
+                                                                    </MultiBinding>
+                                                                </TextBlock.Text>
+                                                            </TextBlock>
+                                                        </ToolTip.Tip>
                                                     </Button>
 
                                                     <Button Margin="0 0 5 0" FontStyle="Italic" HorizontalAlignment="Right"
@@ -768,7 +788,7 @@
                                                                                                 <ColumnDefinition Width="*" />
                                                                                                 <ColumnDefinition Width="Auto" />
                                                                                             </Grid.ColumnDefinitions>
-                                                                                            <TextBlock HorizontalAlignment="Center" Text="{Binding SelectedVideoQualityItem.stringValue, FallbackValue=''}"
+                                                                                            <TextBlock HorizontalAlignment="Center" Text="{Binding SelectedVideoQualityItem, FallbackValue=''}"
                                                                                                        VerticalAlignment="Center" />
                                                                                             <Path Grid.Column="1" Data="M 0,1 L 4,4 L 8,1" Stroke="White" StrokeThickness="1"
                                                                                                   VerticalAlignment="Center" Margin="5,0,5,0" Stretch="Uniform" Width="8" />
@@ -783,13 +803,7 @@
                                                                                         <ListBox x:Name="ListBoxQulitiesSelection" SelectionMode="Single,Toggle" Width="210"
                                                                                                  MaxHeight="400"
                                                                                                  ItemsSource="{Binding VideoQualityList , Mode=OneWay}"
-                                                                                                 SelectedItem="{Binding SelectedVideoQualityItem}">
-                                                                                            <ListBox.ItemTemplate>
-                                                                                                <DataTemplate DataType="{x:Type structs:StringItem}">
-                                                                                                    <TextBlock Text="{Binding stringValue}"></TextBlock>
-                                                                                                </DataTemplate>
-                                                                                            </ListBox.ItemTemplate>
-                                                                                        </ListBox>
+                                                                                                 SelectedItem="{Binding SelectedVideoQualityItem}" />
                                                                                     </Border>
                                                                                 </Popup>
                                                                             </StackPanel>
@@ -822,13 +836,7 @@
                                                                                         <ListBox x:Name="ListBoxDubsSelection" SelectionMode="Multiple,Toggle" Width="210"
                                                                                                  MaxHeight="400"
                                                                                                  ItemsSource="{Binding DubLangList , Mode=OneWay}"
-                                                                                                 SelectedItems="{Binding SelectedDubLang}">
-                                                                                            <ListBox.ItemTemplate>
-                                                                                                <DataTemplate DataType="{x:Type structs:StringItem}">
-                                                                                                    <TextBlock Text="{Binding stringValue}"></TextBlock>
-                                                                                                </DataTemplate>
-                                                                                            </ListBox.ItemTemplate>
-                                                                                        </ListBox>
+                                                                                                 SelectedItems="{Binding SelectedDubLang}" />
                                                                                     </Border>
                                                                                 </Popup>
                                                                             </StackPanel>
@@ -858,13 +866,7 @@
                                                                                         <ListBox SelectionMode="Multiple,Toggle" Width="210"
                                                                                                  MaxHeight="400"
                                                                                                  ItemsSource="{Binding SubLangList , Mode=OneWay}"
-                                                                                                 SelectedItems="{Binding SelectedSubLang}">
-                                                                                            <ListBox.ItemTemplate>
-                                                                                                <DataTemplate DataType="{x:Type structs:StringItem}">
-                                                                                                    <TextBlock Text="{Binding stringValue}"></TextBlock>
-                                                                                                </DataTemplate>
-                                                                                            </ListBox.ItemTemplate>
-                                                                                        </ListBox>
+                                                                                                 SelectedItems="{Binding SelectedSubLang}" />
                                                                                     </Border>
                                                                                 </Popup>
                                                                             </StackPanel>

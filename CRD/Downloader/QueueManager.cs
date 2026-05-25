@@ -279,6 +279,9 @@ public sealed partial class QueueManager : ObservableObject{
         if (!crunchyrollManager.CrunOptions.AutoDownload)
             return;
 
+        if (!ProgramManager.Instance.FinishedLoading)
+            return;
+
         lock (autoDownloadBlockLock){
             if (autoDownloadBlockedUntilUtc.HasValue && !HasPendingRetryItems()){
                 autoDownloadBlockedUntilUtc = null;

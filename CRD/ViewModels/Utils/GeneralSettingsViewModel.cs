@@ -95,6 +95,9 @@ public partial class GeneralSettingsViewModel : ViewModelBase{
     private bool downloadOnlyWithAllSelectedDubSub;
 
     [ObservableProperty]
+    private bool replaceExistingFiles;
+
+    [ObservableProperty]
     private bool downloadAllowEarlyStart;
 
     [ObservableProperty]
@@ -453,6 +456,7 @@ public partial class GeneralSettingsViewModel : ViewModelBase{
         DownloadMethodeNew = options.DownloadMethodeNew;
         DownloadAllowEarlyStart = options.DownloadAllowEarlyStart;
         DownloadOnlyWithAllSelectedDubSub = options.DownloadOnlyWithAllSelectedDubSub;
+        ReplaceExistingFiles = options.ReplaceExistingFiles;
         PersistQueue = options.PersistQueue;
         RetryAttempts = Math.Clamp((options.RetryAttempts), 1, 10);
         RetryDelay = Math.Clamp((options.RetryDelay), 1, 30);
@@ -530,6 +534,7 @@ public partial class GeneralSettingsViewModel : ViewModelBase{
         settings.DownloadMethodeNew = DownloadMethodeNew;
         settings.DownloadAllowEarlyStart = DownloadAllowEarlyStart;
         settings.DownloadOnlyWithAllSelectedDubSub = DownloadOnlyWithAllSelectedDubSub;
+        settings.ReplaceExistingFiles = ReplaceExistingFiles;
         settings.PersistQueue = PersistQueue;
 
         settings.BackgroundImageBlurRadius = Math.Clamp((BackgroundImageBlurRadius ?? 0), 0, 40);
@@ -1204,10 +1209,6 @@ public partial class GeneralSettingsViewModel : ViewModelBase{
 
                         Parallel.ForEach(historyList, historySeries => {
                             historySeries.Init();
-
-                            foreach (var historySeriesSeason in historySeries.Seasons){
-                                historySeriesSeason.Init();
-                            }
                         });
                     } else{
                         CrunchyrollManager.Instance.HistoryList = new ObservableCollection<HistorySeries>();

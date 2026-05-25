@@ -144,6 +144,12 @@
                     </controls:SettingsExpanderItem.Footer>
                 </controls:SettingsExpanderItem>
 
+                <controls:SettingsExpanderItem Content="Replace Existing Files" Description="When enabled, downloads overwrite an existing final output file instead of creating a numbered copy">
+                    <controls:SettingsExpanderItem.Footer>
+                        <CheckBox IsChecked="{Binding ReplaceExistingFiles}"> </CheckBox>
+                    </controls:SettingsExpanderItem.Footer>
+                </controls:SettingsExpanderItem>
+
                 <controls:SettingsExpanderItem Content="Max Download Speed"
                                                Description="Download in Kb/s - 0 is full speed">
                     <controls:SettingsExpanderItem.Footer>

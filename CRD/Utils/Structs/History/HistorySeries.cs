@@ -77,6 +77,10 @@ public class HistorySeries : INotifyPropertyChanged{
 
     public event PropertyChangedEventHandler? PropertyChanged;
 
+    private void OnPropertyChanged(string propertyName){
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+    }
+
     [JsonIgnore]
     public Bitmap? ThumbnailImage{ get; set; }
 
@@ -95,7 +99,7 @@ public class HistorySeries : INotifyPropertyChanged{
         set{
             if (_editModeEnabled != value){
                 _editModeEnabled = value;
-                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(EditModeEnabled)));
+                OnPropertyChanged(nameof(EditModeEnabled));
             }
         }
     }
@@ -115,16 +119,16 @@ public class HistorySeries : INotifyPropertyChanged{
     private bool Loading;
 
     [JsonIgnore]
-    public StringItem? _selectedVideoQualityItem;
+    public string _selectedVideoQualityItem = "";
 
     [JsonIgnore]
-    public StringItem? SelectedVideoQualityItem{
+    public string SelectedVideoQualityItem{
         get => _selectedVideoQualityItem;
         set{
-            _selectedVideoQualityItem = value;
+            _selectedVideoQualityItem = value ?? "";
 
-            HistorySeriesVideoQualityOverride = value?.stringValue ?? "";
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(SelectedVideoQualityItem)));
+            HistorySeriesVideoQualityOverride = _selectedVideoQualityItem;
+            OnPropertyChanged(nameof(SelectedVideoQualityItem));
             if (!Loading){
                 CfgManager.UpdateHistoryFile();
             }
@@ -138,32 +142,20 @@ public class HistorySeries : INotifyPropertyChanged{
     public string SelectedDubs{ get; set; } = "";
 
     [JsonIgnore]
-    public ObservableCollection<StringItem> SelectedSubLang{ get; set; } = new();
+    public ObservableCollection<string> SelectedSubLang{ get; set; } = new();
 
     [JsonIgnore]
-    public ObservableCollection<StringItem> SelectedDubLang{ get; set; } = new();
+    public ObservableCollection<string> SelectedDubLang{ get; set; } = new();
 
 
     [JsonIgnore]
-    public ObservableCollection<StringItem> DubLangList{ get; } = new(){
-    };
+    public ObservableCollection<string> DubLangList => HistoryOverrideOptions.GetDubLangList(SeriesStreamingService);
 
     [JsonIgnore]
-    public ObservableCollection<StringItem> SubLangList{ get; } = new(){
-        new StringItem(){ stringValue = "all" },
-        new StringItem(){ stringValue = "none" },
-    };
+    public ObservableCollection<string> SubLangList => HistoryOverrideOptions.GetSubLangList(SeriesStreamingService);
 
     [JsonIgnore]
-    public ObservableCollection<StringItem> VideoQualityList{ get; } = new(){
-        new StringItem(){ stringValue = "best" },
-        new StringItem(){ stringValue = "1080p" },
-        new StringItem(){ stringValue = "720p" },
-        new StringItem(){ stringValue = "480p" },
-        new StringItem(){ stringValue = "360p" },
-        new StringItem(){ stringValue = "240p" },
-        new StringItem(){ stringValue = "worst" },
-    };
+    public ObservableCollection<string> VideoQualityList => HistoryOverrideOptions.GetVideoQualityList(SeriesStreamingService);
 
     private void UpdateSubAndDubString(){
         HistorySeriesSoftSubsOverride.Clear();
@@ -171,21 +163,21 @@ public class HistorySeries : INotifyPropertyChanged{
 
         if (SelectedSubLang.Count != 0){
             for (var i = 0; i < SelectedSubLang.Count; i++){
-                HistorySeriesSoftSubsOverride.Add(SelectedSubLang[i].stringValue);
+                HistorySeriesSoftSubsOverride.Add(SelectedSubLang[i]);
             }
         }
 
         if (SelectedDubLang.Count != 0){
             for (var i = 0; i < SelectedDubLang.Count; i++){
-                HistorySeriesDubLangOverride.Add(SelectedDubLang[i].stringValue);
+                HistorySeriesDubLangOverride.Add(SelectedDubLang[i]);
             }
         }
 
         SelectedDubs = string.Join(", ", HistorySeriesDubLangOverride) ?? "";
         SelectedSubs = string.Join(", ", HistorySeriesSoftSubsOverride) ?? "";
 
-        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(SelectedSubs)));
-        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(SelectedDubs)));
+        OnPropertyChanged(nameof(SelectedSubs));
+        OnPropertyChanged(nameof(SelectedDubs));
 
         CfgManager.UpdateHistoryFile();
     }
@@ -195,18 +187,14 @@ public class HistorySeries : INotifyPropertyChanged{
     }
 
     public void Init(){
+        SelectedSubLang.CollectionChanged -= Changes;
+        SelectedDubLang.CollectionChanged -= Changes;
+
         Loading = true;
-        if (!(SubLangList.Count > 2 || DubLangList.Count > 0)){
-            foreach (var languageItem in Languages.languages){
-                SubLangList.Add(new StringItem{ stringValue = languageItem.CrLocale });
-                DubLangList.Add(new StringItem{ stringValue = languageItem.CrLocale });
-            }
-        }
+        SelectedVideoQualityItem = VideoQualityList.FirstOrDefault(HistorySeriesVideoQualityOverride.Equals) ?? "";
 
-        SelectedVideoQualityItem = VideoQualityList.FirstOrDefault(a => HistorySeriesVideoQualityOverride.Equals(a.stringValue)) ?? new StringItem(){ stringValue = "" };
-
-        var softSubLang = SubLangList.Where(a => HistorySeriesSoftSubsOverride.Contains(a.stringValue)).ToList();
-        var dubLang = DubLangList.Where(a => HistorySeriesDubLangOverride.Contains(a.stringValue)).ToList();
+        var softSubLang = SubLangList.Where(HistorySeriesSoftSubsOverride.Contains).ToList();
+        var dubLang = DubLangList.Where(HistorySeriesDubLangOverride.Contains).ToList();
 
         SelectedSubLang.Clear();
         foreach (var listBoxItem in softSubLang){
@@ -225,8 +213,16 @@ public class HistorySeries : INotifyPropertyChanged{
         SelectedDubLang.CollectionChanged += Changes;
 
         UpdateSeriesFolderPath();
+        InitSeasons();
 
         Loading = false;
+    }
+
+    private void InitSeasons(){
+        foreach (var season in Seasons){
+            season.StreamingService = SeriesStreamingService;
+            season.Init();
+        }
     }
 
     #endregion
@@ -239,7 +235,7 @@ public class HistorySeries : INotifyPropertyChanged{
             ThumbnailImage = await Helpers.LoadImage(ThumbnailImageUrl);
             IsImageLoaded = true;
 
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(ThumbnailImage)));
+            OnPropertyChanged(nameof(ThumbnailImage));
         } catch (Exception ex){
             Console.Error.WriteLine("Failed to load image: " + ex.Message);
         }
@@ -247,7 +243,7 @@ public class HistorySeries : INotifyPropertyChanged{
 
  public void UpdateNewEpisodes(){
         NewEpisodes = EnumerateEpisodes().Count();
-        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(NewEpisodes)));
+        OnPropertyChanged(nameof(NewEpisodes));
     }
 
     public async Task AddNewMissingToDownloads(bool checkQueueForId = false){
@@ -282,7 +278,7 @@ public class HistorySeries : INotifyPropertyChanged{
                         if (skipUnmonitored && sonarrEnabled && !ep.SonarrIsMonitored)
                             continue;
 
-                        if (ShouldCountEpisode(ep, useSonarr, countMissing, false))
+                        if (ShouldCountEpisode(season, ep, useSonarr, countMissing, false))
                             yield return ep;
                     }
                 }
@@ -298,44 +294,82 @@ public class HistorySeries : INotifyPropertyChanged{
 
                 if (ep.SpecialEpisode){
                     if (historyAddSpecials &&
-                        ShouldCountEpisode(ep, useSonarr, countMissing, false)){
+                        ShouldCountEpisode(season, ep, useSonarr, countMissing, false)){
                         yield return ep;
                     }
 
                     continue;
                 }
 
-                if (ShouldCountEpisode(ep, useSonarr, countMissing, foundWatched)){
+                if (ShouldCountEpisode(season, ep, useSonarr, countMissing, foundWatched)){
                     yield return ep;
                 } else{
-                    foundWatched = true;
-
-                    if (!historyAddSpecials && !countMissing)
-                        break;
+                    if (ep.WasDownloaded && !IsPartialDownloadActionable(season, ep)){
+                        foundWatched = true;
+                    }
                 }
             }
-
-            if (foundWatched && !historyAddSpecials && !countMissing)
-                break;
         }
     }
 
-    private bool ShouldCountEpisode(HistoryEpisode episode, bool useSonarr, bool countMissing, bool foundWatched){
+    private bool ShouldCountEpisode(HistorySeason season, HistoryEpisode episode, bool useSonarr, bool countMissing, bool foundWatched){
         if (useSonarr)
             return !string.IsNullOrEmpty(episode.SonarrEpisodeId) && !episode.SonarrHasFile;
 
-        return !episode.WasDownloaded && (!foundWatched || countMissing);
+        return IsPartialDownloadActionable(season, episode) ||
+               !episode.WasDownloaded && (!foundWatched || countMissing);
     }
 
-    public void SetFetchingData(){
-        FetchingData = true;
-        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(FetchingData)));
+    private bool IsPartialDownloadActionable(HistorySeason season, HistoryEpisode episode){
+        var requestedDubs = GetEffectiveDubLang(this, season);
+        var requestedSoftSubs = GetEffectiveSoftSubs(this, season, episode);
+
+        return episode.HasAvailableMissingDownloadedMedia(requestedDubs, requestedSoftSubs);
+    }
+
+    public static IEnumerable<string> GetEffectiveDubLang(HistorySeries? series, HistorySeason? season){
+        if (season?.HistorySeasonDubLangOverride.Count > 0){
+            return season.HistorySeasonDubLangOverride;
+        }
+
+        if (series?.HistorySeriesDubLangOverride.Count > 0){
+            return series.HistorySeriesDubLangOverride;
+        }
+
+        return series?.SeriesStreamingService == StreamingService.Crunchyroll
+            ? CrunchyrollManager.Instance.CrunOptions.DubLang
+            : [];
+    }
+
+    public static IEnumerable<string> GetEffectiveSoftSubs(HistorySeries? series, HistorySeason? season, HistoryEpisode episode){
+        IEnumerable<string> requested;
+
+        if (season?.HistorySeasonSoftSubsOverride.Count > 0){
+            requested = season.HistorySeasonSoftSubsOverride;
+        } else if (series?.HistorySeriesSoftSubsOverride.Count > 0){
+            requested = series.HistorySeriesSoftSubsOverride;
+        } else{
+            requested = series?.SeriesStreamingService == StreamingService.Crunchyroll
+                ? CrunchyrollManager.Instance.CrunOptions.DlSubs
+                : [];
+        }
+
+        var requestedList = requested.ToList();
+
+        return requestedList.Contains("all")
+            ? episode.HistoryEpisodeAvailableSoftSubs
+            : requestedList.Where(item => item != "none");
+    }
+
+    public void SetFetchingData(bool fetchingData = true){
+        FetchingData = fetchingData;
+        OnPropertyChanged(nameof(FetchingData));
     }
 
     public async Task<bool> FetchData(string? seasonId){
         Console.WriteLine($"Fetching Data for: {SeriesTitle}");
         FetchingData = true;
-        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(FetchingData)));
+        OnPropertyChanged(nameof(FetchingData));
         var isOk = true;
 
         switch (SeriesType){
@@ -366,11 +400,11 @@ public class HistorySeries : INotifyPropertyChanged{
         }
 
 
-        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(SeriesTitle)));
-        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(SeriesDescription)));
+        OnPropertyChanged(nameof(SeriesTitle));
+        OnPropertyChanged(nameof(SeriesDescription));
         UpdateNewEpisodes();
         FetchingData = false;
-        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(FetchingData)));
+        OnPropertyChanged(nameof(FetchingData));
 
         return isOk;
     }
@@ -379,7 +413,7 @@ public class HistorySeries : INotifyPropertyChanged{
         HistorySeason? objectToRemove = Seasons.FirstOrDefault(se => se.SeasonId == season) ?? null;
         if (objectToRemove != null){
             Seasons.Remove(objectToRemove);
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(Seasons)));
+            OnPropertyChanged(nameof(Seasons));
             CfgManager.UpdateHistoryFile();
         }
     }
@@ -417,7 +451,7 @@ public class HistorySeries : INotifyPropertyChanged{
         if (!string.IsNullOrEmpty(SeriesDownloadPath) && Directory.Exists(SeriesDownloadPath)){
             SeriesFolderPath = SeriesDownloadPath;
             SeriesFolderPathExists = true;
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(SeriesFolderPathExists)));
+            OnPropertyChanged(nameof(SeriesFolderPathExists));
             return;
         }
 
@@ -431,7 +465,7 @@ public class HistorySeries : INotifyPropertyChanged{
                 if (!string.IsNullOrEmpty(parentFolder) && Directory.Exists(parentFolder)){
                     SeriesFolderPath = parentFolder;
                     SeriesFolderPathExists = true;
-                    PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(SeriesFolderPathExists)));
+                    OnPropertyChanged(nameof(SeriesFolderPathExists));
                     return;
                 }
             } catch (Exception e){
@@ -441,14 +475,14 @@ public class HistorySeries : INotifyPropertyChanged{
 
         // Auto generated path
         if (string.IsNullOrEmpty(SeriesTitle)){
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(SeriesFolderPathExists)));
+            OnPropertyChanged(nameof(SeriesFolderPathExists));
             return;
         }
 
         var seriesTitle = FileNameManager.CleanupFilename(SeriesTitle);
 
         if (string.IsNullOrEmpty(seriesTitle)){
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(SeriesFolderPathExists)));
+            OnPropertyChanged(nameof(SeriesFolderPathExists));
             return;
         }
 
@@ -464,6 +498,6 @@ public class HistorySeries : INotifyPropertyChanged{
             SeriesFolderPathExists = true;
         }
 
-        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(SeriesFolderPathExists)));
+        OnPropertyChanged(nameof(SeriesFolderPathExists));
     }
 }

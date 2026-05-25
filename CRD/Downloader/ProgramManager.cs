@@ -36,7 +36,7 @@ public sealed partial class ProgramManager : ObservableObject{
     private bool fetchingData;
 
     [ObservableProperty]
-    private bool updateAvailable = true;
+    private bool updateAvailable;
 
     [ObservableProperty]
     private bool finishedLoading;
@@ -338,9 +338,6 @@ public sealed partial class ProgramManager : ObservableObject{
         try{
             CrunchyrollManager.Instance.InitOptions();
 
-            UpdateAvailable = await Updater.Instance.CheckForUpdatesAsync();
-            await Updater.Instance.CheckGhJsonAsync();
-
             if (CrunchyrollManager.Instance.CrunOptions.AccentColor != null && !string.IsNullOrEmpty(CrunchyrollManager.Instance.CrunOptions.AccentColor)){
                 if (_faTheme != null) _faTheme.CustomAccentColor = Color.Parse(CrunchyrollManager.Instance.CrunOptions.AccentColor);
             }
@@ -356,10 +353,17 @@ public sealed partial class ProgramManager : ObservableObject{
                     Application.Current.RequestedThemeVariant = ThemeVariant.Light;
                 }
             }
-
+            
+            await Updater.Instance.CheckGhJsonAsync();
+            
             await CrunchyrollManager.Instance.Init();
-
+            
+            UpdateAvailable = await Updater.Instance.CheckForUpdatesAsync();
+            
             FinishedLoading = true;
+            QueueManager.Instance.UpdateDownloadListItems();
+            
+     
 
             await WorkOffArgsTasks();
 

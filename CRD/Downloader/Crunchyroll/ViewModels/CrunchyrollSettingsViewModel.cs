@@ -219,6 +219,9 @@ public partial class CrunchyrollSettingsViewModel : ViewModelBase{
     private bool endpointNotSignedWarning;
 
     [ObservableProperty]
+    private ComboBoxItem _selectedDefaultVideoLang;
+
+    [ObservableProperty]
     private ComboBoxItem _selectedDefaultDubLang;
 
     [ObservableProperty]
@@ -278,6 +281,10 @@ public partial class CrunchyrollSettingsViewModel : ViewModelBase{
 
 
     public ObservableCollection<ComboBoxItem> DefaultDubLangList{ get; } = [
+        new(){ Content = "none" },
+    ];
+
+    public ObservableCollection<ComboBoxItem> DefaultVideoLangList{ get; } = [
         new(){ Content = "none" },
     ];
 
@@ -369,6 +376,7 @@ public partial class CrunchyrollSettingsViewModel : ViewModelBase{
             HardSubLangList.Add(new ComboBoxItem{ Content = languageItem.CrLocale });
             SubLangList.Add(new ListBoxItem{ Content = languageItem.CrLocale });
             DubLangList.Add(new ListBoxItem{ Content = languageItem.CrLocale });
+            DefaultVideoLangList.Add(new ComboBoxItem{ Content = languageItem.CrLocale });
             DefaultDubLangList.Add(new ComboBoxItem{ Content = languageItem.CrLocale });
             DefaultSubLangList.Add(new ComboBoxItem{ Content = languageItem.CrLocale });
         }
@@ -388,6 +396,9 @@ public partial class CrunchyrollSettingsViewModel : ViewModelBase{
 
         ComboBoxItem? hsLang = HardSubLangList.FirstOrDefault(a => a.Content != null && (string)a.Content == options.Hslang) ?? null;
         SelectedHSLang = hsLang ?? HardSubLangList[0];
+
+        ComboBoxItem? defaultVideoLang = DefaultVideoLangList.FirstOrDefault(a => a.Content != null && (string)a.Content == (options.DefaultVideo ?? "")) ?? null;
+        SelectedDefaultVideoLang = defaultVideoLang ?? DefaultVideoLangList[0];
 
         ComboBoxItem? defaultDubLang = DefaultDubLangList.FirstOrDefault(a => a.Content != null && (string)a.Content == (options.DefaultAudio ?? "")) ?? null;
         SelectedDefaultDubLang = defaultDubLang ?? DefaultDubLangList[0];
@@ -600,6 +611,7 @@ public partial class CrunchyrollSettingsViewModel : ViewModelBase{
         CrunchyrollManager.Instance.CrunOptions.Hslang = SelectedHSLang.Content + "";
         CrunchyrollManager.Instance.CrunOptions.HsRawFallback = HsRawFallback;
 
+        CrunchyrollManager.Instance.CrunOptions.DefaultVideo = SelectedDefaultVideoLang.Content + "";
         CrunchyrollManager.Instance.CrunOptions.DefaultAudio = SelectedDefaultDubLang.Content + "";
         CrunchyrollManager.Instance.CrunOptions.DefaultSub = SelectedDefaultSubLang.Content + "";
 
@@ -742,9 +754,6 @@ public partial class CrunchyrollSettingsViewModel : ViewModelBase{
 
                         foreach (var historySeries in CrunchyrollManager.Instance.HistoryList){
                             historySeries.Init();
-                            foreach (var historySeriesSeason in historySeries.Seasons){
-                                historySeriesSeason.Init();
-                            }
                         }
                     } else{
                         CrunchyrollManager.Instance.HistoryList = [];

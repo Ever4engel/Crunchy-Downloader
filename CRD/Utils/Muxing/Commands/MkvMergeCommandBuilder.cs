@@ -1,4 +1,5 @@
 ﻿using System;
+using System.IO;
 using System.Linq;
 using CRD.Utils.Muxing.Structs;
 using CRD.Utils.Structs;
@@ -81,7 +82,14 @@ public class MkvMergeCommandBuilder(MergerOptions options) : CommandBuilder(opti
     }
 
     private void AddVideoOnly(){
-        foreach (var vid in Options.OnlyVid){
+        var sorted = Options.OnlyVid
+            .OrderBy(a => {
+                var index = Options.DubLangList.IndexOf(a.Language.CrLocale);
+                return index != -1 ? index : int.MaxValue;
+            })
+            .ToList();
+        
+        foreach (var vid in sorted){
             if (!hasVideo || Options.KeepAllVideos){
                 Add("--video-tracks 0");
                 Add("--no-audio");
@@ -119,6 +127,16 @@ public class MkvMergeCommandBuilder(MergerOptions options) : CommandBuilder(opti
     private void AddTrackMetadata(string trackNum, LanguageItem lang){
         Add($"--track-name {trackNum}:\"{lang.Name}\"");
         Add($"--language {trackNum}:{lang.Code}");
+        AddDefaultVideo(trackNum, lang);
+    }
+
+    private void AddDefaultVideo(string trackNum, LanguageItem lang){
+        if (Options.Defaults.Video?.Code == lang.Code &&
+            Options.Defaults.Video != Languages.DEFAULT_lang){
+            Add($"--default-track {trackNum}");
+        } else{
+            Add($"--default-track {trackNum}:0");
+        }
     }
 
     private void AddAudioMetadata(string trackNum, MergerInput track){
@@ -236,6 +254,11 @@ public class MkvMergeCommandBuilder(MergerOptions options) : CommandBuilder(opti
         var cover = Options.Cover.FirstOrDefault();
 
         if (cover?.Path != null){
+            if (!File.Exists(cover.Path)){
+                Console.Error.WriteLine($"Cover file not found, skipping attachment: {cover.Path}");
+                return;
+            }
+
             Add($"--attach-file \"{cover.Path}\"");
             Add("--attachment-mime-type image/png");
             Add("--attachment-name cover.png");

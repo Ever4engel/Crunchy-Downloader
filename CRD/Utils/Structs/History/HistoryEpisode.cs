@@ -34,6 +34,12 @@ public class HistoryEpisode : INotifyPropertyChanged{
     [JsonProperty("episode_was_downloaded")]
     public bool WasDownloaded{ get; set; }
 
+    [JsonProperty("episode_downloaded_dub_lang")]
+    public List<string> DownloadedDubLang{ get; set; } = [];
+
+    [JsonProperty("episode_downloaded_soft_subs")]
+    public List<string> DownloadedSoftSubs{ get; set; } = [];
+
     [JsonProperty("episode_tracked_series_release_notified")]
     public bool TrackedSeriesReleaseNotified{ get; set; }
 
@@ -126,14 +132,80 @@ public class HistoryEpisode : INotifyPropertyChanged{
 
     public event PropertyChangedEventHandler? PropertyChanged;
 
+    public bool IsPartiallyDownloaded(IEnumerable<string> requestedDubs, IEnumerable<string> requestedSoftSubs){
+        return WasDownloaded &&
+               (IsMissingAny(requestedDubs, DownloadedDubLang) ||
+                IsMissingAny(requestedSoftSubs, DownloadedSoftSubs));
+    }
+
+    public bool HasAvailableMissingDownloadedMedia(IEnumerable<string> requestedDubs, IEnumerable<string> requestedSoftSubs){
+        return WasDownloaded &&
+               (HasMissingAvailableItem(requestedDubs, DownloadedDubLang, HistoryEpisodeAvailableDubLang) ||
+                HasMissingAvailableItem(requestedSoftSubs, DownloadedSoftSubs, HistoryEpisodeAvailableSoftSubs));
+    }
+
+    private static bool IsMissingAny(IEnumerable<string> requested, List<string> downloaded){
+        var requestedList = requested
+            .Where(item => !string.IsNullOrWhiteSpace(item))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        if (requestedList.Count == 0 || downloaded.Count == 0){
+            return false;
+        }
+
+        var downloadedSet = downloaded.ToHashSet(StringComparer.OrdinalIgnoreCase);
+        return requestedList.Any(item => !downloadedSet.Contains(item));
+    }
+
+    private static bool HasMissingAvailableItem(IEnumerable<string> requested, List<string> downloaded, List<string> available){
+        var requestedList = requested
+            .Where(item => !string.IsNullOrWhiteSpace(item))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        if (requestedList.Count == 0 || downloaded.Count == 0 || available.Count == 0){
+            return false;
+        }
+
+        var downloadedSet = downloaded.ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var availableSet = available.ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        return requestedList.Any(item => !downloadedSet.Contains(item) && availableSet.Contains(item));
+    }
+
+    private void NotifyDownloadStateChanged(){
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(WasDownloaded)));
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(DownloadedDubLang)));
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(DownloadedSoftSubs)));
+    }
+
+    private void NotifyAvailableMediaChanged(){
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(HistoryEpisodeAvailableDubLang)));
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(HistoryEpisodeAvailableSoftSubs)));
+    }
+
+    public void SetDownloadedMedia(List<string> downloadedDubs, List<string> downloadedSoftSubs){
+        WasDownloaded = true;
+        DownloadedDubLang = downloadedDubs.Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+        DownloadedSoftSubs = downloadedSoftSubs.Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+        NotifyDownloadStateChanged();
+    }
+
+    public void UpdateAvailableMedia(List<string> availableDubs, List<string> availableSoftSubs){
+        HistoryEpisodeAvailableDubLang = availableDubs.Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+        HistoryEpisodeAvailableSoftSubs = availableSoftSubs.Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+        NotifyAvailableMediaChanged();
+    }
+
     public void ToggleWasDownloaded(){
         WasDownloaded = !WasDownloaded;
-        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(WasDownloaded)));
+        NotifyDownloadStateChanged();
     }
 
     public void ToggleWasDownloadedSeries(HistorySeries? series){
         WasDownloaded = !WasDownloaded;
-        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(WasDownloaded)));
+        NotifyDownloadStateChanged();
 
         if (series?.Seasons != null){
             foreach (var historySeason in series.Seasons){
@@ -181,6 +253,17 @@ public class HistoryEpisode : INotifyPropertyChanged{
         SonarrIsMonitored = episode.Monitored;
         SonarrAbsolutNumber = episode.AbsoluteEpisodeNumber.ToString();
         SonarrSeasonNumber = episode.SeasonNumber.ToString();
+
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(SonarrSeasonEpisodeText)));
+    }
+
+    public void ClearSonarrEpisodeData(){
+        SonarrEpisodeId = null;
+        SonarrEpisodeNumber = null;
+        SonarrHasFile = false;
+        SonarrIsMonitored = false;
+        SonarrAbsolutNumber = null;
+        SonarrSeasonNumber = null;
 
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(SonarrSeasonEpisodeText)));
     }

@@ -2,10 +2,12 @@
 using System.Collections.Generic;
 using System.Collections.Specialized;
 using System.Diagnostics;
+using System.Linq;
 using System.Net.Http;
 using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using CRD.Downloader.Crunchyroll;
 using CRD.Utils.Sonarr.Models;
@@ -19,6 +21,11 @@ public class SonarrClient{
     private HttpClient httpClient;
 
     private SonarrProperties properties;
+
+    private readonly SemaphoreSlim refreshLock = new(1, 1);
+    private readonly TimeSpan sonarrSeriesCacheDuration = TimeSpan.FromMinutes(2);
+    private DateTime lastSonarrSeriesRefreshUtc = DateTime.MinValue;
+    private string? lastSonarrSeriesSettingsKey;
 
     public List<SonarrSeries> SonarrSeries =[];
     
@@ -48,27 +55,64 @@ public class SonarrClient{
     }
 
     public async Task RefreshSonarr(){
-        await CheckSonarrSettings();
-        if (CrunchyrollManager.Instance.CrunOptions.SonarrProperties is{ SonarrEnabled: true }){
-            SonarrSeries = await GetSeries();
-            CrunchyrollManager.Instance.History.MatchHistorySeriesWithSonarr(true);
-            
-            foreach (var historySeries in CrunchyrollManager.Instance.HistoryList){
-                if (!string.IsNullOrEmpty(historySeries.SonarrSeriesId)){
-                    List<SonarrEpisode>? episodes = await GetEpisodes(int.Parse(historySeries.SonarrSeriesId));
-                    historySeries.SonarrNextAirDate = CrunchyrollManager.Instance.History.GetNextAirDate(episodes);
-                }
-            }
+        if (!await refreshLock.WaitAsync(0)){
+            Console.WriteLine("[Sonarr Refresh] Skipped because another Sonarr refresh is already running.");
+            return;
+        }
 
-            
+        try{
+            await CheckSonarrSettings();
+
+            if (CrunchyrollManager.Instance.CrunOptions.SonarrProperties is{ SonarrEnabled: true }){
+                SonarrSeries = await GetSeriesForRefresh();
+
+                CrunchyrollManager.Instance.History.MatchHistorySeriesWithSonarr(true);
+
+                var matchedHistorySeries = CrunchyrollManager.Instance.HistoryList
+                    .Select(historySeries => new{
+                        HistorySeries = historySeries,
+                        IsValidSonarrSeriesId = int.TryParse(historySeries.SonarrSeriesId, out var sonarrSeriesId),
+                        SonarrSeriesId = sonarrSeriesId
+                    })
+                    .Where(item => item.IsValidSonarrSeriesId)
+                    .ToList();
+
+                using var throttler = new SemaphoreSlim(8);
+
+                var refreshTasks = matchedHistorySeries.Select(async item => {
+                    await throttler.WaitAsync();
+
+                    try{
+                        var episodes = await GetEpisodes(item.SonarrSeriesId);
+                        item.HistorySeries.SonarrNextAirDate = CrunchyrollManager.Instance.History.GetNextAirDate(episodes);
+                    } finally{
+                        throttler.Release();
+                    }
+                });
+
+                await Task.WhenAll(refreshTasks);
+            }
+        } finally{
+            refreshLock.Release();
         }
     }
     
     public async Task RefreshSonarrLite(){
-        await CheckSonarrSettings();
-        if (CrunchyrollManager.Instance.CrunOptions.SonarrProperties is{ SonarrEnabled: true }){
-            SonarrSeries = await GetSeries();
-            CrunchyrollManager.Instance.History.MatchHistorySeriesWithSonarr(true);
+        if (!await refreshLock.WaitAsync(0)){
+            Console.WriteLine("[Sonarr Lite Refresh] Skipped because another Sonarr refresh is already running.");
+            return;
+        }
+
+        try{
+            await CheckSonarrSettings();
+
+            if (CrunchyrollManager.Instance.CrunOptions.SonarrProperties is{ SonarrEnabled: true }){
+                SonarrSeries = await GetSeriesForRefresh();
+
+                CrunchyrollManager.Instance.History.MatchHistorySeriesWithSonarr(true);
+            }
+        } finally{
+            refreshLock.Release();
         }
     }
     
@@ -78,6 +122,33 @@ public class SonarrClient{
         if (properties != null ){
             apiUrl = $"http{(properties.UseSsl ? "s" : "")}://{(!string.IsNullOrEmpty(properties.Host) ? properties.Host : "localhost")}:{properties.Port}{(properties.UrlBase ?? "")}/api";
         }
+    }
+
+    private async Task<List<SonarrSeries>> GetSeriesForRefresh(){
+        var settingsKey = GetSonarrSettingsKey();
+
+        if (SonarrSeries.Count > 0 &&
+            settingsKey == lastSonarrSeriesSettingsKey &&
+            DateTime.UtcNow - lastSonarrSeriesRefreshUtc < sonarrSeriesCacheDuration){
+            return SonarrSeries;
+        }
+
+        var series = await GetSeries();
+        lastSonarrSeriesRefreshUtc = DateTime.UtcNow;
+        lastSonarrSeriesSettingsKey = settingsKey;
+
+        return series;
+    }
+
+    private string GetSonarrSettingsKey(){
+        if (properties == null) return string.Empty;
+
+        return string.Join('|',
+            properties.UseSsl,
+            properties.Host ?? string.Empty,
+            properties.Port,
+            properties.UrlBase ?? string.Empty,
+            properties.ApiKey ?? string.Empty);
     }
     
     public async Task CheckSonarrSettings(){

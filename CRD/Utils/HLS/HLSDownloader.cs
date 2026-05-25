@@ -78,6 +78,11 @@ public class HlsDownloader{
         _cancellationToken.ThrowIfCancellationRequested();
         string fn = _data.OutputFile ?? string.Empty;
 
+        if (_data.M3U8Json != null && _newDownloadMethode){
+            List<dynamic> segments = _data.M3U8Json.Segments;
+            return await DownloadSegmentsBufferedResumeAsync(segments, fn);
+        }
+
         if (File.Exists(fn) && File.Exists($"{fn}.resume") && _data.Offset < 1){
             try{
                 Console.WriteLine("Resume data found! Trying to resume...");
@@ -171,11 +176,6 @@ public class HlsDownloader{
                 segments = segments.GetRange(_data.Offset, segments.Count - _data.Offset);
                 Console.WriteLine($"Resuming download from part {_data.Offset + 1}...");
                 _data.Parts.Completed = _data.Offset;
-            }
-
-
-            if (_newDownloadMethode){
-                return await DownloadSegmentsBufferedResumeAsync(segments, fn);
             }
 
             for (int p = 0; p < Math.Ceiling((double)segments.Count / _data.Threads); p++){
@@ -432,25 +432,102 @@ public class HlsDownloader{
         var totalSeg = _data.Parts.Total;
         string sessionId = Path.GetFileNameWithoutExtension(fn);
         string tempDir = Path.Combine(Path.GetDirectoryName(fn) ?? string.Empty, $"{sessionId}_temp");
+        string resumeFile = $"{fn}.new.resume";
 
         Directory.CreateDirectory(tempDir);
 
-        string resumeFile = $"{fn}.new.resume";
         int downloadedParts = 0;
         int mergedParts = 0;
+        bool hasBufferedResume = false;
 
         if (File.Exists(resumeFile)){
             try{
-                var resumeData = JsonConvert.DeserializeObject<dynamic>(File.ReadAllText(resumeFile));
-                downloadedParts = (int?)resumeData?.DownloadedParts ?? 0;
-                mergedParts = (int?)resumeData?.MergedParts ?? 0;
+                var resumeData = JsonConvert.DeserializeObject<BufferedResumeData>(File.ReadAllText(resumeFile));
+                if (resumeData?.Total == totalSeg &&
+                    resumeData.DownloadedParts >= 0 &&
+                    resumeData.MergedParts >= 0 &&
+                    resumeData.DownloadedParts <= totalSeg &&
+                    resumeData.MergedParts <= resumeData.DownloadedParts){
+                    downloadedParts = resumeData.DownloadedParts;
+                    mergedParts = resumeData.MergedParts;
+                    hasBufferedResume = mergedParts == 0 || File.Exists(fn);
+                } else{
+                    Console.WriteLine("Buffered resume data is wrong!");
+                }
             } catch{
-                // ignored
+                Console.WriteLine("Buffered resume data is wrong!");
             }
         }
 
-        if (downloadedParts > totalSeg) downloadedParts = totalSeg;
-        if (mergedParts > downloadedParts) mergedParts = downloadedParts;
+        if (File.Exists(fn) && !hasBufferedResume){
+            string rwts = !string.IsNullOrEmpty(_data.Override) ? _data.Override : "Y";
+            rwts = rwts.ToUpper();
+
+            if (rwts.StartsWith("Y")){
+                Console.WriteLine($"Deleting «{fn}»...");
+                File.Delete(fn);
+                Helpers.DeleteFile($"{fn}.resume");
+                CleanupNewDownloadMethod(tempDir, resumeFile);
+                Directory.CreateDirectory(tempDir);
+                downloadedParts = 0;
+                mergedParts = 0;
+            } else if (rwts.StartsWith("C")){
+                return (Ok: true, _data.Parts);
+            } else{
+                return (Ok: false, _data.Parts);
+            }
+        } else if (File.Exists(resumeFile) && !hasBufferedResume){
+            CleanupNewDownloadMethod(tempDir, resumeFile);
+            Directory.CreateDirectory(tempDir);
+            downloadedParts = 0;
+            mergedParts = 0;
+            hasBufferedResume = false;
+        }
+
+        if (hasBufferedResume && File.Exists(fn) && mergedParts > 0){
+            Console.WriteLine($"Adding content to «{fn}»...");
+
+            if (mergedParts == totalSeg){
+                Console.WriteLine("Already finished");
+                return (Ok: true, _data.Parts);
+            }
+        } else{
+            if (hasBufferedResume){
+                Console.WriteLine("Buffered resume data found! Trying to resume...");
+            }
+
+            Console.WriteLine($"Saving stream to «{fn}»...");
+
+            if (!File.Exists(fn) && segments.Count > 0 && segments[0].map != null && !_data.SkipInit){
+                Console.WriteLine("Download and save init part...");
+                Segment initSeg = new Segment();
+                initSeg.Uri = ObjectUtilities.GetMemberValue(segments[0].map, "uri");
+                initSeg.Key = ObjectUtilities.GetMemberValue(segments[0].map, "key");
+                initSeg.ByteRange = ObjectUtilities.GetMemberValue(segments[0].map, "byteRange");
+
+                if (ObjectUtilities.GetMemberValue(segments[0], "key") != null){
+                    initSeg.Key = segments[0].Key;
+                }
+
+                try{
+                    var initDl = await DownloadPart(initSeg, 0, 0);
+                    await File.WriteAllBytesAsync(fn, initDl, _cancellationToken);
+                    await File.WriteAllTextAsync(resumeFile, JsonConvert.SerializeObject(new BufferedResumeData{
+                        DownloadedParts = 0,
+                        MergedParts = 0,
+                        Total = totalSeg
+                    }), _cancellationToken);
+                    Console.WriteLine("Init part downloaded.");
+                } catch (Exception e){
+                    Console.Error.WriteLine($"Part init download error:\n\t{e.Message}");
+                    return (false, _data.Parts);
+                }
+            } else if (segments.Count > 0 && segments[0].map != null && _data.SkipInit){
+                Console.WriteLine("Skipping init part can lead to broken video!");
+            }
+        }
+
+        _data.DateStart = DateTimeOffset.Now.ToUnixTimeMilliseconds();
 
         var semaphore = new SemaphoreSlim(_data.Threads);
         var downloadTasks = new List<Task>();
@@ -840,6 +917,12 @@ public class Info{
 public class ResumeData{
     public int Total{ get; set; }
     public int Completed{ get; set; }
+}
+
+public class BufferedResumeData{
+    public int Total{ get; set; }
+    public int DownloadedParts{ get; set; }
+    public int MergedParts{ get; set; }
 }
 
 public class M3U8Json{

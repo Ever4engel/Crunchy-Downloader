@@ -45,24 +45,31 @@ public class HistorySeason : INotifyPropertyChanged{
     [JsonIgnore]
     public bool IsExpanded{ get; set; }
 
+    [JsonIgnore]
+    public StreamingService StreamingService{ get; set; } = StreamingService.Unknown;
+
     public event PropertyChangedEventHandler? PropertyChanged;
+
+    private void OnPropertyChanged(string propertyName){
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+    }
 
     #region Settings Override
 
     [JsonIgnore]
-    public StringItem? _selectedVideoQualityItem;
+    public string _selectedVideoQualityItem = "";
 
     [JsonIgnore]
     private bool Loading;
 
     [JsonIgnore]
-    public StringItem? SelectedVideoQualityItem{
+    public string SelectedVideoQualityItem{
         get => _selectedVideoQualityItem;
         set{
-            _selectedVideoQualityItem = value;
+            _selectedVideoQualityItem = value ?? "";
 
-            HistorySeasonVideoQualityOverride = value?.stringValue ?? "";
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(SelectedVideoQualityItem)));
+            HistorySeasonVideoQualityOverride = _selectedVideoQualityItem;
+            OnPropertyChanged(nameof(SelectedVideoQualityItem));
             if (!Loading){
                 CfgManager.UpdateHistoryFile();
             }
@@ -76,31 +83,19 @@ public class HistorySeason : INotifyPropertyChanged{
     public string SelectedDubs{ get; set; } = "";
 
     [JsonIgnore]
-    public ObservableCollection<StringItem> SelectedSubLang{ get; set; } = new();
+    public ObservableCollection<string> SelectedSubLang{ get; set; } = new();
 
     [JsonIgnore]
-    public ObservableCollection<StringItem> SelectedDubLang{ get; set; } = new();
+    public ObservableCollection<string> SelectedDubLang{ get; set; } = new();
 
     [JsonIgnore]
-    public ObservableCollection<StringItem> DubLangList{ get; } = new(){
-    };
+    public ObservableCollection<string> DubLangList => HistoryOverrideOptions.GetDubLangList(StreamingService);
 
     [JsonIgnore]
-    public ObservableCollection<StringItem> SubLangList{ get; } = new(){
-        new StringItem(){ stringValue = "all" },
-        new StringItem(){ stringValue = "none" },
-    };
+    public ObservableCollection<string> SubLangList => HistoryOverrideOptions.GetSubLangList(StreamingService);
 
     [JsonIgnore]
-    public ObservableCollection<StringItem> VideoQualityList{ get; } = new(){
-        new StringItem(){ stringValue = "best" },
-        new StringItem(){ stringValue = "1080p" },
-        new StringItem(){ stringValue = "720p" },
-        new StringItem(){ stringValue = "480p" },
-        new StringItem(){ stringValue = "360p" },
-        new StringItem(){ stringValue = "240p" },
-        new StringItem(){ stringValue = "worst" },
-    };
+    public ObservableCollection<string> VideoQualityList => HistoryOverrideOptions.GetVideoQualityList(StreamingService);
 
     private void UpdateSubAndDubString(){
         HistorySeasonSoftSubsOverride.Clear();
@@ -108,13 +103,13 @@ public class HistorySeason : INotifyPropertyChanged{
 
         if (SelectedSubLang.Count != 0){
             for (var i = 0; i < SelectedSubLang.Count; i++){
-                HistorySeasonSoftSubsOverride.Add(SelectedSubLang[i].stringValue);
+                HistorySeasonSoftSubsOverride.Add(SelectedSubLang[i]);
             }
         }
 
         if (SelectedDubLang.Count != 0){
             for (var i = 0; i < SelectedDubLang.Count; i++){
-                HistorySeasonDubLangOverride.Add(SelectedDubLang[i].stringValue);
+                HistorySeasonDubLangOverride.Add(SelectedDubLang[i]);
             }
         }
 
@@ -122,8 +117,8 @@ public class HistorySeason : INotifyPropertyChanged{
         SelectedSubs = string.Join(", ", HistorySeasonSoftSubsOverride) ?? "";
 
 
-        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(SelectedSubs)));
-        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(SelectedDubs)));
+        OnPropertyChanged(nameof(SelectedSubs));
+        OnPropertyChanged(nameof(SelectedDubs));
 
         CfgManager.UpdateHistoryFile();
     }
@@ -133,18 +128,14 @@ public class HistorySeason : INotifyPropertyChanged{
     }
 
     public void Init(){
+        SelectedSubLang.CollectionChanged -= Changes;
+        SelectedDubLang.CollectionChanged -= Changes;
+
         Loading = true;
-        if (!(SubLangList.Count > 2 || DubLangList.Count > 0)){
-            foreach (var languageItem in Languages.languages){
-                SubLangList.Add(new StringItem{ stringValue = languageItem.CrLocale });
-                DubLangList.Add(new StringItem{ stringValue = languageItem.CrLocale });
-            }
-        }
+        SelectedVideoQualityItem = VideoQualityList.FirstOrDefault(HistorySeasonVideoQualityOverride.Equals) ?? "";
 
-        SelectedVideoQualityItem = VideoQualityList.FirstOrDefault(a => HistorySeasonVideoQualityOverride.Equals(a.stringValue)) ?? new StringItem(){ stringValue = "" };
-
-        var softSubLang = SubLangList.Where(a => HistorySeasonSoftSubsOverride.Contains(a.stringValue)).ToList();
-        var dubLang = DubLangList.Where(a => HistorySeasonDubLangOverride.Contains(a.stringValue)).ToList();
+        var softSubLang = SubLangList.Where(HistorySeasonSoftSubsOverride.Contains).ToList();
+        var dubLang = DubLangList.Where(HistorySeasonDubLangOverride.Contains).ToList();
 
         SelectedSubLang.Clear();
         foreach (var listBoxItem in softSubLang){
@@ -173,18 +164,18 @@ public class HistorySeason : INotifyPropertyChanged{
         }
 
         DownloadedEpisodes = EpisodesList.FindAll(e => e.WasDownloaded).Count;
-        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(DownloadedEpisodes)));
+        OnPropertyChanged(nameof(DownloadedEpisodes));
         CfgManager.UpdateHistoryFile();
     }
 
     public void UpdateDownloaded(){
         DownloadedEpisodes = EpisodesList.FindAll(e => e.WasDownloaded).Count;
-        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(DownloadedEpisodes)));
+        OnPropertyChanged(nameof(DownloadedEpisodes));
         CfgManager.UpdateHistoryFile();
     }
 
     public void UpdateDownloadedSilent(){
         DownloadedEpisodes = EpisodesList.FindAll(e => e.WasDownloaded).Count;
-        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(DownloadedEpisodes)));
+        OnPropertyChanged(nameof(DownloadedEpisodes));
     }
 }

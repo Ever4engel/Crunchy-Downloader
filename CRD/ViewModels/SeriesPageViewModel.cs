@@ -285,8 +285,15 @@ public partial class SeriesPageViewModel : ViewModelBase{
 
     [RelayCommand]
     public async Task RefreshSonarrEpisodeMatch(){
-        await CrunchyrollManager.Instance.History.MatchHistoryEpisodesWithSonarr(true, SelectedSeries);
-        CfgManager.UpdateHistoryFile();
+        SelectedSeries.SetFetchingData();
+        await Task.Yield();
+
+        try{
+            await Task.Run(async () => await CrunchyrollManager.Instance.History.MatchHistoryEpisodesWithSonarr(true, SelectedSeries));
+            CfgManager.UpdateHistoryFile();
+        } finally{
+            SelectedSeries.SetFetchingData(false);
+        }
     }
 
     [RelayCommand]

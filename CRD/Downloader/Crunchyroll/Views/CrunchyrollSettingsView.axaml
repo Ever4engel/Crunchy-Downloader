@@ -560,6 +560,15 @@
                     </controls:SettingsExpanderItem.Footer>
                 </controls:SettingsExpanderItem>
 
+                <controls:SettingsExpanderItem IsVisible="{Binding !SkipMuxing}" Content="Default Video ">
+                    <controls:SettingsExpanderItem.Footer>
+                        <ComboBox HorizontalContentAlignment="Center" MinWidth="210" MaxDropDownHeight="400"
+                                  ItemsSource="{Binding DefaultVideoLangList}"
+                                  SelectedItem="{Binding SelectedDefaultVideoLang}">
+                        </ComboBox>
+                    </controls:SettingsExpanderItem.Footer>
+                </controls:SettingsExpanderItem>
+
                 <controls:SettingsExpanderItem IsVisible="{Binding !SkipMuxing}" Content="Default Audio ">
                     <controls:SettingsExpanderItem.Footer>
                         <ComboBox HorizontalContentAlignment="Center" MinWidth="210" MaxDropDownHeight="400"

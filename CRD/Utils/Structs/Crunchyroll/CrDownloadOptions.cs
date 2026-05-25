@@ -83,6 +83,9 @@ public class CrDownloadOptions{
     [JsonProperty("download_only_with_all_selected_dubsub")]
     public bool DownloadOnlyWithAllSelectedDubSub{ get; set; }
 
+    [JsonProperty("replace_existing_files")]
+    public bool ReplaceExistingFiles{ get; set; }
+
     [JsonProperty("background_image_opacity")]
     public double BackgroundImageOpacity{ get; set; }
 
@@ -324,6 +327,9 @@ public class CrDownloadOptions{
 
     [JsonProperty("mux_default_sub_forced_display")]
     public bool DefaultSubForcedDisplay{ get; set; }
+
+    [JsonProperty("mux_default_video")]
+    public string DefaultVideo{ get; set; } = "";
 
     [JsonProperty("mux_default_dub")]
     public string DefaultAudio{ get; set; } = "";

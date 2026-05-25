@@ -9,6 +9,7 @@ using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.RegularExpressions;
+using System.Threading;
 using CRD.Downloader.Crunchyroll;
 using Newtonsoft.Json;
 
@@ -285,26 +286,39 @@ public class CfgManager{
     }
 
 
-    private static object fileLock = new object();
-
     public static void WriteJsonToFile(string pathToFile, object obj){
-        try{
-            // Check if the directory exists; if not, create it.
-            string directoryPath = Path.GetDirectoryName(pathToFile);
-            if (!Directory.Exists(directoryPath)){
-                Directory.CreateDirectory(directoryPath);
-            }
+        string? directoryPath = Path.GetDirectoryName(pathToFile);
+        if (string.IsNullOrEmpty(directoryPath))
+            directoryPath = Environment.CurrentDirectory;
 
-            lock (fileLock){
-                using (var fileStream = new FileStream(pathToFile, FileMode.Create, FileAccess.Write, FileShare.None))
+        Directory.CreateDirectory(directoryPath);
+
+        string key = Path.GetFullPath(pathToFile);
+        object gate = _pathLocks.GetOrAdd(key, _ => new object());
+
+        lock (gate){
+            string tmp = Path.Combine(
+                directoryPath,
+                "." + Path.GetFileName(pathToFile) + "." + Guid.NewGuid().ToString("N") + ".tmp");
+
+            try{
+                using (var fileStream = new FileStream(tmp, FileMode.CreateNew, FileAccess.Write, FileShare.None))
                 using (var streamWriter = new StreamWriter(fileStream))
                 using (var jsonWriter = new JsonTextWriter(streamWriter){ Formatting = Formatting.Indented }){
                     var serializer = new JsonSerializer();
                     serializer.Serialize(jsonWriter, obj);
                 }
+
+                ReplaceFileWithRetry(tmp, pathToFile);
+            } catch (Exception ex){
+                try{
+                    if (File.Exists(tmp)) File.Delete(tmp);
+                } catch{
+                    // ignored
+                }
+
+                Console.Error.WriteLine($"An error occurred writing {pathToFile}: {ex.Message}");
             }
-        } catch (Exception ex){
-            Console.Error.WriteLine($"An error occurred: {ex.Message}");
         }
     }
 
@@ -354,8 +368,11 @@ public class CfgManager{
                 throw new FileNotFoundException($"The file at path {pathToFile} does not exist.");
             }
 
-            lock (fileLock){
-                using (var fileStream = new FileStream(pathToFile, FileMode.Open, FileAccess.Read))
+            string key = Path.GetFullPath(pathToFile);
+            object gate = _pathLocks.GetOrAdd(key, _ => new object());
+
+            lock (gate){
+                using (var fileStream = new FileStream(pathToFile, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete))
                 using (var streamReader = new StreamReader(fileStream))
                 using (var jsonReader = new JsonTextReader(streamReader)){
                     var serializer = new JsonSerializer();
@@ -369,12 +386,58 @@ public class CfgManager{
     }
 
     public static void DeleteFileIfExists(string pathToFile){
-        try{
-            if (File.Exists(pathToFile)){
-                File.Delete(pathToFile);
+        string key = Path.GetFullPath(pathToFile);
+        object gate = _pathLocks.GetOrAdd(key, _ => new object());
+
+        lock (gate){
+            try{
+                if (File.Exists(pathToFile)){
+                    DeleteFileWithRetry(pathToFile);
+                }
+            } catch (Exception ex){
+                Console.Error.WriteLine($"An error occurred while deleting the file {pathToFile}: {ex.Message}");
             }
-        } catch (Exception ex){
-            Console.Error.WriteLine($"An error occurred while deleting the file {pathToFile}: {ex.Message}");
+        }
+    }
+
+    private static void ReplaceFileWithRetry(string sourcePath, string destinationPath){
+        const int maxAttempts = 5;
+
+        for (int attempt = 1; attempt <= maxAttempts; attempt++){
+            try{
+                if (File.Exists(destinationPath)){
+                    File.Replace(sourcePath, destinationPath, null, ignoreMetadataErrors: true);
+                } else{
+                    File.Move(sourcePath, destinationPath, overwrite: true);
+                }
+
+                return;
+            } catch (IOException) when (attempt < maxAttempts){
+                Thread.Sleep(100 * attempt);
+            } catch (UnauthorizedAccessException) when (attempt < maxAttempts){
+                Thread.Sleep(100 * attempt);
+            }
+        }
+
+        if (File.Exists(destinationPath)){
+            File.Replace(sourcePath, destinationPath, null, ignoreMetadataErrors: true);
+        } else{
+            File.Move(sourcePath, destinationPath, overwrite: true);
+        }
+    }
+
+    private static void DeleteFileWithRetry(string pathToFile){
+        const int maxAttempts = 5;
+
+        for (int attempt = 1; attempt <= maxAttempts; attempt++){
+            try{
+                File.Delete(pathToFile);
+                return;
+            } catch (IOException) when (attempt < maxAttempts){
+                Thread.Sleep(100 * attempt);
+            } catch (UnauthorizedAccessException) when (attempt < maxAttempts){
+                Thread.Sleep(100 * attempt);
+            }
         }
     }
 }
