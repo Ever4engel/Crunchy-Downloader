@@ -255,6 +255,9 @@ public partial class GeneralSettingsViewModel : ViewModelBase{
     private bool proxyEnabled;
 
     [ObservableProperty]
+    private bool proxyAllTraffic;
+
+    [ObservableProperty]
     private bool proxySocks;
 
     [ObservableProperty]
@@ -436,6 +439,7 @@ public partial class GeneralSettingsViewModel : ViewModelBase{
         }
 
         ProxyEnabled = options.ProxyEnabled;
+        ProxyAllTraffic = options.ProxyAllTraffic;
         ProxySocks = options.ProxySocks;
         ProxyHost = options.ProxyHost ?? "";
         ProxyUsername = options.ProxyUsername ?? "";
@@ -563,6 +567,7 @@ public partial class GeneralSettingsViewModel : ViewModelBase{
         QueueManager.Instance.SetProcessingLimit(settings.SimultaneousProcessingJobs);
 
         settings.ProxyEnabled = ProxyEnabled;
+        settings.ProxyAllTraffic = ProxyAllTraffic;
         settings.ProxySocks = ProxySocks;
         settings.ProxyHost = ProxyHost;
         settings.ProxyPort = Math.Clamp((int)(ProxyPort ?? 0), 0, 65535);

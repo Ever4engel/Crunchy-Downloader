@@ -546,6 +546,12 @@
                     </controls:SettingsExpanderItem.Footer>
                 </controls:SettingsExpanderItem>
 
+                <controls:SettingsExpanderItem Content="Proxy All Traffic">
+                    <controls:SettingsExpanderItem.Footer>
+                        <CheckBox IsChecked="{Binding ProxyAllTraffic}"> </CheckBox>
+                    </controls:SettingsExpanderItem.Footer>
+                </controls:SettingsExpanderItem>
+
                 <controls:SettingsExpanderItem Content="Use Socks5 Proxy">
                     <controls:SettingsExpanderItem.Footer>
                         <CheckBox IsChecked="{Binding ProxySocks}"> </CheckBox>

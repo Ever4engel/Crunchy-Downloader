@@ -123,7 +123,7 @@ public class CrunchyrollManager{
         options.Force = "Y";
         options.FileName = "${seriesTitle} - S${season}E${episode} [${height}p]";
         options.Partsize = 10;
-        options.DubDownloadDelaySeconds = 0;
+        options.DownloadDelaySeconds = 0;
         options.DlSubs = new List<string>{ "en-US" };
         options.SkipMuxing = false;
         options.MkvmergeOptions = [];
@@ -1199,25 +1199,35 @@ public class CrunchyrollManager{
         if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows)){
             if (!ffmpegAvailable){
                 Console.Error.WriteLine("Missing ffmpeg");
-                MainWindow.Instance.ShowError($"FFmpeg not found at: {CfgManager.PathFFMPEG}", "FFmpeg",
+                MainWindow.Instance.ShowError(
+                    "FFmpeg is required to process downloaded video and audio, but CRD could not find it.\n\n" +
+                    $"Expected file:\n{CfgManager.PathFFMPEG}\n\n" +
+                    "Download FFmpeg and place ffmpeg.exe in CRD's lib folder.",
+                    "Download FFmpeg",
                     "https://github.com/GyanD/codexffmpeg/releases/latest");
+                Helpers.EnsureDirectoriesExist(CfgManager.PathFFMPEG);
                 return new DownloadResponse{
                     Data = new List<DownloadedMedia>(),
                     Error = true,
                     FileName = "./unknown",
-                    ErrorText = "Missing ffmpeg"
+                    ErrorText = "FFmpeg is missing"
                 };
             }
 
             if (!mkvmergeAvailable){
                 Console.Error.WriteLine("Missing Mkvmerge");
-                MainWindow.Instance.ShowError($"Mkvmerge not found at: {CfgManager.PathMKVMERGE}", "Mkvmerge",
+                MainWindow.Instance.ShowError(
+                    "Mkvmerge is required to create the final MKV file, but CRD could not find it.\n\n" +
+                    $"Expected file:\n{CfgManager.PathMKVMERGE}\n\n" +
+                    "Download MKVToolNix and place mkvmerge.exe in CRD's lib folder.",
+                    "Download MKVToolNix",
                     "https://mkvtoolnix.download/downloads.html#windows");
+                Helpers.EnsureDirectoriesExist(CfgManager.PathMKVMERGE);
                 return new DownloadResponse{
                     Data = new List<DownloadedMedia>(),
                     Error = true,
                     FileName = "./unknown",
-                    ErrorText = "Missing Mkvmerge"
+                    ErrorText = "Mkvmerge is missing"
                 };
             }
         } else{
@@ -1346,8 +1356,15 @@ public class CrunchyrollManager{
 
             data.Data = sortedMetaData;
 
+            if (!options.DownloadDelayUseDubBased){
+                await WaitForDownloadDelayAsync(data, options);
+            }
+
             foreach (CrunchyEpMetaData epMeta in data.Data){
-                await WaitForDubDownloadDelayAsync(data, options);
+                if (options.DownloadDelayUseDubBased){
+                    await WaitForDownloadDelayAsync(data, options);
+                }
+
                 Console.WriteLine($"Requesting: [{epMeta.MediaId}] {mediaName}");
 
                 string currentMediaId = (epMeta.MediaId.Contains(':') ? epMeta.MediaId.Split(':')[1] : epMeta.MediaId);
@@ -2380,7 +2397,13 @@ public class CrunchyrollManager{
                 }
 
                 // await Task.Delay(options.Waittime);
-                ScheduleNextDubDownloadDelay(options);
+                if (options.DownloadDelayUseDubBased){
+                    ScheduleNextDownloadDelay(options);
+                }
+            }
+
+            if (!options.DownloadDelayUseDubBased){
+                ScheduleNextDownloadDelay(options);
             }
         }
 
@@ -2473,8 +2496,8 @@ public class CrunchyrollManager{
         };
     }
 
-    private async Task WaitForDubDownloadDelayAsync(CrunchyEpMeta data, CrDownloadOptions options){
-        if (options.DubDownloadDelaySeconds <= 0){
+    private async Task WaitForDownloadDelayAsync(CrunchyEpMeta data, CrDownloadOptions options){
+        if (options.DownloadDelaySeconds <= 0){
             return;
         }
 
@@ -2488,25 +2511,26 @@ public class CrunchyrollManager{
 
             if (nextAllowedAt.HasValue && nextAllowedAt.Value > now){
                 var delay = nextAllowedAt.Value - now;
-                data.DownloadProgress.Doing = $"Waiting {Math.Ceiling(delay.TotalSeconds)}s before next dub";
+                var delayTarget = options.DownloadDelayUseDubBased ? "dub" : "episode";
+                data.DownloadProgress.Doing = $"Waiting {Math.Ceiling(delay.TotalSeconds)}s before next {delayTarget}";
                 QueueManager.Instance.RefreshQueue();
                 await Task.Delay(delay, data.Cts.Token);
             }
 
             lock (dubDownloadDelayLock){
-                nextDubDownloadAllowedAtUtc = DateTimeOffset.UtcNow.AddSeconds(options.DubDownloadDelaySeconds);
+                nextDubDownloadAllowedAtUtc = DateTimeOffset.UtcNow.AddSeconds(options.DownloadDelaySeconds);
             }
         } finally{
             dubDownloadDelaySemaphore.Release();
         }
     }
 
-    private void ScheduleNextDubDownloadDelay(CrDownloadOptions options){
-        if (options.DubDownloadDelaySeconds <= 0){
+    private void ScheduleNextDownloadDelay(CrDownloadOptions options){
+        if (options.DownloadDelaySeconds <= 0){
             return;
         }
 
-        var nextAllowedAt = DateTimeOffset.UtcNow.AddSeconds(options.DubDownloadDelaySeconds);
+        var nextAllowedAt = DateTimeOffset.UtcNow.AddSeconds(options.DownloadDelaySeconds);
         lock (dubDownloadDelayLock){
             if (!nextDubDownloadAllowedAtUtc.HasValue || nextAllowedAt > nextDubDownloadAllowedAtUtc.Value){
                 nextDubDownloadAllowedAtUtc = nextAllowedAt;
