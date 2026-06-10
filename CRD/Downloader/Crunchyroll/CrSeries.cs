@@ -421,7 +421,7 @@ public class CrSeries{
         var response = await HttpClientReq.Instance.SendHttpRequest(request);
 
         if (!response.IsOk){
-            Console.Error.WriteLine("Series Request Failed");
+            Console.Error.WriteLine($"Series seasons request failed for series id '{id}'");
             return null;
         }
 
@@ -454,7 +454,7 @@ public class CrSeries{
         var response = await HttpClientReq.Instance.SendHttpRequest(request);
 
         if (!response.IsOk){
-            Console.Error.WriteLine("Series Request Failed");
+            Console.Error.WriteLine($"Series details request failed for series id '{id}'");
             return null;
         }
 
@@ -490,7 +490,7 @@ public class CrSeries{
         var response = await HttpClientReq.Instance.SendHttpRequest(request);
 
         if (!response.IsOk){
-            Console.Error.WriteLine("Series Request Failed");
+            Console.Error.WriteLine($"Series search request failed for query '{searchString}'");
             return null;
         }
 
@@ -536,7 +536,7 @@ public class CrSeries{
             var response = await HttpClientReq.Instance.SendHttpRequest(request);
 
             if (!response.IsOk){
-                Console.Error.WriteLine("Series Request Failed");
+                Console.Error.WriteLine($"All series browse request failed for start '{i}'");
                 return null;
             }
 
@@ -572,7 +572,7 @@ public class CrSeries{
         var response = await HttpClientReq.Instance.SendHttpRequest(request);
 
         if (!response.IsOk){
-            Console.Error.WriteLine("Series Request Failed");
+            Console.Error.WriteLine($"Seasonal series request failed for '{season}-{year}'");
             return null;
         }
 

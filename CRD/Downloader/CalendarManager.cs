@@ -248,7 +248,7 @@ public class CalendarManager{
         Task anilistUpcomingTask = crunOptions.CalendarShowUpcomingEpisodes
             ? LoadAnilistUpcoming()
             : Task.CompletedTask;
-        Task<CrBrowseEpisodeBase?> newEpisodesTask = crunInstance.CrEpisode.GetNewEpisodes(crunOptions.HistoryLang, 2000, null, true);
+        Task<CrBrowseEpisodeBase?> newEpisodesTask = crunInstance.CrEpisode.GetNewEpisodes(crunOptions.HistoryLang, 2000, firstDayOfWeek, true);
 
         await Task.WhenAll(anilistUpcomingTask, newEpisodesTask);
 
@@ -498,11 +498,15 @@ public class CalendarManager{
             return;
         }
 
-        var requestedDubs = HistorySeries.GetEffectiveDubLang(historySeries, historyMatch.HistorySeason);
-        var requestedSoftSubs = HistorySeries.GetEffectiveSoftSubs(historySeries, historyMatch.HistorySeason, historyMatch.HistoryEpisode);
-        calEpisode.HistoryDownloadState = historyMatch.HistoryEpisode.IsPartiallyDownloaded(requestedDubs, requestedSoftSubs)
-            ? CalendarHistoryDownloadState.PartlyDownloaded
-            : CalendarHistoryDownloadState.Downloaded;
+        if (CrunchyrollManager.Instance.CrunOptions.HistoryCheckPartialDownloads){
+            var requestedDubs = HistorySeries.GetEffectiveDubLang(historySeries, historyMatch.HistorySeason);
+            var requestedSoftSubs = HistorySeries.GetEffectiveSoftSubs(historySeries, historyMatch.HistorySeason, historyMatch.HistoryEpisode);
+            calEpisode.HistoryDownloadState = historyMatch.HistoryEpisode.IsPartiallyDownloaded(requestedDubs, requestedSoftSubs)
+                ? CalendarHistoryDownloadState.PartlyDownloaded
+                : CalendarHistoryDownloadState.Downloaded;
+        } else{
+            calEpisode.HistoryDownloadState = CalendarHistoryDownloadState.Downloaded;
+        }
     }
 
     private static (HistorySeason? HistorySeason, HistoryEpisode? HistoryEpisode) FindHistoryMatch(

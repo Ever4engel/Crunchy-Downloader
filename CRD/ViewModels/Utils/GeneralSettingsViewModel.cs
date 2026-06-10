@@ -47,6 +47,9 @@ public partial class GeneralSettingsViewModel : ViewModelBase{
     private bool historyCountMissing;
 
     [ObservableProperty]
+    private bool historyCheckPartialDownloads;
+
+    [ObservableProperty]
     private bool historyIncludeCrArtists;
     
     [ObservableProperty]
@@ -446,6 +449,7 @@ public partial class GeneralSettingsViewModel : ViewModelBase{
         ProxyPassword = options.ProxyPassword ?? "";
         ProxyPort = options.ProxyPort;
         HistoryCountMissing = options.HistoryCountMissing;
+        HistoryCheckPartialDownloads = options.HistoryCheckPartialDownloads;
         HistoryIncludeCrArtists = options.HistoryIncludeCrArtists;
         HistoryRemoveMissingEpisodes = options.HistoryRemoveMissingEpisodes;
         HistoryAddSpecials = options.HistoryAddSpecials;
@@ -551,6 +555,7 @@ public partial class GeneralSettingsViewModel : ViewModelBase{
 
         settings.DownloadToTempFolder = DownloadToTempFolder;
         settings.HistoryCountMissing = HistoryCountMissing;
+        settings.HistoryCheckPartialDownloads = HistoryCheckPartialDownloads;
         settings.HistoryAddSpecials = HistoryAddSpecials;
         settings.HistoryIncludeCrArtists = HistoryIncludeCrArtists;
         settings.HistoryRemoveMissingEpisodes = HistoryRemoveMissingEpisodes;
@@ -1225,6 +1230,15 @@ public partial class GeneralSettingsViewModel : ViewModelBase{
                 _ = Task.Run(() => SonarrClient.Instance.RefreshSonarrLite());
             } else{
                 CrunchyrollManager.Instance.HistoryList = new ObservableCollection<HistorySeries>();
+            }
+        }
+
+        if (settingsLoaded && e.PropertyName is nameof(HistoryCheckPartialDownloads)){
+            foreach (var historySeries in CrunchyrollManager.Instance.HistoryList){
+                historySeries.UpdateNewEpisodes();
+                foreach (var episode in historySeries.Seasons.SelectMany(season => season.EpisodesList)){
+                    episode.RefreshDownloadState();
+                }
             }
         }
 

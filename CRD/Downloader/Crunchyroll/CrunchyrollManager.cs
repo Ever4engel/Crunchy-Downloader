@@ -422,7 +422,7 @@ public class CrunchyrollManager{
             Doing = "Starting",
             RetryAttemptCount = retryAttemptCount
         };
-        QueueManager.Instance.RefreshQueue();
+        QueueManager.Instance.RefreshItem(data);
         var res = new DownloadResponse();
         try{
             res = await DownloadMediaList(data, options);
@@ -454,7 +454,7 @@ public class CrunchyrollManager{
                 DownloadSpeedBytes = 0,
                 Doing = "Download Error" + (!string.IsNullOrEmpty(res.ErrorText) ? " - " + res.ErrorText : ""),
             };
-            QueueManager.Instance.RefreshQueue();
+            QueueManager.Instance.NotifyQueueItemStateChanged(data);
             await NotificationPublisher.Instance.PublishDownloadFailedAsync(CrunOptions.NotificationSettings, data, res.ErrorText);
             return false;
         }
@@ -469,7 +469,7 @@ public class CrunchyrollManager{
                     DownloadSpeedBytes = 0,
                     Doing = "Waiting for Muxing/Encoding"
                 };
-                QueueManager.Instance.RefreshQueue();
+                QueueManager.Instance.RefreshItem(data);
                 await QueueManager.Instance.WaitForProcessingSlotAsync(data.Cts.Token);
                 processingSlotHeld = true;
             }
@@ -489,7 +489,7 @@ public class CrunchyrollManager{
                     Doing = "Muxing"
                 };
 
-                QueueManager.Instance.RefreshQueue();
+                QueueManager.Instance.RefreshItem(data);
 
                 if (options.MuxFonts){
                     await FontsManager.Instance.GetFontsAsync();
@@ -559,7 +559,7 @@ public class CrunchyrollManager{
                                 Doing = "Encoding"
                             };
 
-                            QueueManager.Instance.RefreshQueue();
+                            QueueManager.Instance.RefreshItem(data);
 
                             var preset = FfmpegEncoding.GetPreset(options.EncodingPresetName ?? string.Empty);
 
@@ -670,7 +670,7 @@ public class CrunchyrollManager{
                             Doing = "Encoding"
                         };
 
-                        QueueManager.Instance.RefreshQueue();
+                        QueueManager.Instance.RefreshItem(data);
 
                         var preset = FfmpegEncoding.GetPreset(options.EncodingPresetName ?? string.Empty);
                         if (preset != null && result.merger != null) await Helpers.RunFFmpegWithPresetAsync(result.merger.Options.Output, preset, data);
@@ -742,7 +742,7 @@ public class CrunchyrollManager{
         }
 
 
-        QueueManager.Instance.RefreshQueue();
+        QueueManager.Instance.RefreshItem(data);
 
         if (options.History && data.Data is{ Count: > 0 } && (options.HistoryIncludeCrArtists && data.Music || !data.Music)){
             var ids = data.Data.First().GetOriginalIds();
@@ -823,7 +823,7 @@ public class CrunchyrollManager{
             Doing = "Moving Files"
         };
 
-        QueueManager.Instance.RefreshQueue();
+        QueueManager.Instance.RefreshItem(data);
 
         if (string.IsNullOrEmpty(tempFolderPath) || !Directory.Exists(tempFolderPath)){
             Console.WriteLine("Invalid or non-existent temp folder path.");
@@ -997,7 +997,7 @@ public class CrunchyrollManager{
                 Doing = "Muxing – Syncing Dub Timings"
             };
 
-            QueueManager.Instance.RefreshQueue();
+            QueueManager.Instance.RefreshItem(crunchyEpMeta);
 
             var basePath = merger.Options.OnlyVid.First().Path;
             var syncVideosList = data.Where(a => a.Type == DownloadMediaType.SyncVideo).ToList();
@@ -1061,7 +1061,7 @@ public class CrunchyrollManager{
                 Doing = "Muxing"
             };
 
-            QueueManager.Instance.RefreshQueue();
+            QueueManager.Instance.RefreshItem(crunchyEpMeta);
         }
 
         if (!options.Mp4 && !muxToMp3){
@@ -1090,7 +1090,7 @@ public class CrunchyrollManager{
             DownloadSpeedBytes = 0,
             Doing = $"Downloading full-quality fallback video ({string.Join(", ", uniqueFailedLocales)})"
         };
-        QueueManager.Instance.RefreshQueue();
+        QueueManager.Instance.RefreshItem(data);
 
         foreach (var syncVideo in res.Data.Where(media => media.Type == DownloadMediaType.SyncVideo && uniqueFailedLocales.Contains(media.Lang.CrLocale, StringComparer.OrdinalIgnoreCase)).ToList()){
             if (!string.IsNullOrEmpty(syncVideo.Path)){
@@ -1501,7 +1501,7 @@ public class CrunchyrollManager{
                         }
 
                         if (!string.IsNullOrEmpty(error?.Error)){
-                            MainWindow.Instance.ShowError($"Couldn't get Playback Data\n{error.Error}");
+                            MainWindow.Instance.ShowError($"Couldn't get Playback Data\n{error.Error}\n{error.Reason}");
                             return new DownloadResponse{
                                 Data = new List<DownloadedMedia>(),
                                 Error = true,
@@ -2092,7 +2092,7 @@ public class CrunchyrollManager{
                                         DownloadSpeedBytes = 0,
                                         Doing = "Decrypting"
                                     };
-                                    QueueManager.Instance.RefreshQueue();
+                                    QueueManager.Instance.RefreshItem(data);
 
                                     Console.WriteLine("Decryption Needed, attempting to decrypt");
 
@@ -2183,7 +2183,7 @@ public class CrunchyrollManager{
                                                 DownloadSpeedBytes = 0,
                                                 Doing = "Decrypting video"
                                             };
-                                            QueueManager.Instance.RefreshQueue();
+                                            QueueManager.Instance.RefreshItem(data);
                                             var decryptVideo = await Helpers.ExecuteCommandAsyncWorkDir(shaka ? "shaka-packager" : "mp4decrypt", shaka ? CfgManager.PathShakaPackager : CfgManager.PathMP4Decrypt,
                                                 commandVideo, tempTsFileWorkDir);
 
@@ -2244,7 +2244,7 @@ public class CrunchyrollManager{
                                                 DownloadSpeedBytes = 0,
                                                 Doing = "Decrypting audio"
                                             };
-                                            QueueManager.Instance.RefreshQueue();
+                                            QueueManager.Instance.RefreshItem(data);
                                             var decryptAudio = await Helpers.ExecuteCommandAsyncWorkDir(shaka ? "shaka-packager" : "mp4decrypt", shaka ? CfgManager.PathShakaPackager : CfgManager.PathMP4Decrypt,
                                                 commandAudio, tempTsFileWorkDir);
 
@@ -2513,7 +2513,7 @@ public class CrunchyrollManager{
                 var delay = nextAllowedAt.Value - now;
                 var delayTarget = options.DownloadDelayUseDubBased ? "dub" : "episode";
                 data.DownloadProgress.Doing = $"Waiting {Math.Ceiling(delay.TotalSeconds)}s before next {delayTarget}";
-                QueueManager.Instance.RefreshQueue();
+                QueueManager.Instance.RefreshItem(data);
                 await Task.Delay(delay, data.Cts.Token);
             }
 
