@@ -426,8 +426,27 @@
                                                         TextTrimming="CharacterEllipsis" />
 
 
-                                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center"
-                                                                IsVisible="{Binding HistoryEpisodeAvailableDubLang, Converter={StaticResource UiListHasElementsConverter}}">
+                                                    <StackPanel Orientation="Horizontal"
+                                                        VerticalAlignment="Center"
+                                                        HorizontalAlignment="Left"
+                                                        Background="Transparent"
+                                                        IsVisible="{Binding HistoryEpisodeAvailableDubLang, Converter={StaticResource UiListHasElementsConverter}}">
+                                                        <ToolTip.Tip>
+                                                            <Grid ColumnDefinitions="Auto,*" MaxWidth="600">
+                                                                <TextBlock Grid.Column="0" Text="Subs: " />
+                                                                <ui:HighlightingTextBlock
+                                                                    Grid.Column="1"
+                                                                    Items="{Binding HistoryEpisodeAvailableSoftSubs}"
+                                                                    Series="{Binding $parent[UserControl].((vm:SeriesPageViewModel)DataContext).SelectedSeries}"
+                                                                    Season="{Binding $parent[controls:SettingsExpander].((history:HistorySeason)DataContext)}"
+                                                                    StreamingService="Crunchyroll"
+                                                                    CheckDubs="False"
+                                                                    FontSize="12"
+                                                                    Opacity="0.8"
+                                                                    FontStyle="Italic"
+                                                                    TextWrapping="Wrap" />
+                                                            </Grid>
+                                                        </ToolTip.Tip>
                                                         <TextBlock FontStyle="Italic"
                                                                    FontSize="12"
                                                                    Opacity="0.8" Text="Dubs: ">
@@ -445,15 +464,6 @@
 
 
                                                     </StackPanel>
-                                                    <!-- <StackPanel Orientation="Horizontal" VerticalAlignment="Center"> -->
-                                                    <!--     <TextBlock FontStyle="Italic" -->
-                                                    <!--                FontSize="12" -->
-                                                    <!--                Opacity="0.8" Text="Subs: "> -->
-                                                    <!--     </TextBlock> -->
-                                                    <!--     <TextBlock FontStyle="Italic" -->
-                                                    <!--                FontSize="12" -->
-                                                    <!--                Opacity="0.8" Text="{Binding HistoryEpisodeAvailableSoftSubs, Converter={StaticResource UiListToStringConverter}}" /> -->
-                                                    <!-- </StackPanel> -->
                                                 </StackPanel>
 
 

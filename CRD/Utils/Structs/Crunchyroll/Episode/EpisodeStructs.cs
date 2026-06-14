@@ -246,9 +246,16 @@ public class CrunchyEpisode : IHistorySource{
     }
 
     public bool IsSpecialSeason(){
-        if (SeasonTitle.Contains("OVA", StringComparison.Ordinal) ||
-            SeasonTitle.Contains("Special", StringComparison.Ordinal) ||
-            SeasonTitle.Contains("Extra", StringComparison.Ordinal)){
+        var seasonSpecificTitle = SeasonTitle;
+        if (!string.IsNullOrWhiteSpace(SeriesTitle) &&
+            seasonSpecificTitle.StartsWith(SeriesTitle, StringComparison.OrdinalIgnoreCase)){
+            seasonSpecificTitle = seasonSpecificTitle[SeriesTitle.Length..];
+        }
+
+        if (Regex.IsMatch(
+                seasonSpecificTitle,
+                @"\b(OVA|Specials?|Extras?)\b",
+                RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)){
             return true;
         }
         

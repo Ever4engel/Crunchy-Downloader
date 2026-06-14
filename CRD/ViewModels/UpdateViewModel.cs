@@ -93,7 +93,7 @@ public partial class UpdateViewModel : ViewModelBase{
     private int textSize = 16;
     
     public void LoadChangelog(){
-        string changelogPath = "CHANGELOG.md";
+        string changelogPath =  Path.Combine(AppContext.BaseDirectory, "CHANGELOG.md");;
 
         if (!File.Exists(changelogPath)){
             ChangelogBlocks.Clear();

@@ -134,8 +134,8 @@ public class HistoryEpisode : INotifyPropertyChanged{
 
     public bool IsPartiallyDownloaded(IEnumerable<string> requestedDubs, IEnumerable<string> requestedSoftSubs){
         return WasDownloaded &&
-               (IsMissingAny(requestedDubs, DownloadedDubLang) ||
-                IsMissingAny(requestedSoftSubs, DownloadedSoftSubs));
+               (HasMissingAvailableItem(requestedDubs, DownloadedDubLang, HistoryEpisodeAvailableDubLang) ||
+                HasMissingAvailableItem(requestedSoftSubs, DownloadedSoftSubs, HistoryEpisodeAvailableSoftSubs));
     }
 
     public bool HasAvailableMissingDownloadedMedia(IEnumerable<string> requestedDubs, IEnumerable<string> requestedSoftSubs){
@@ -144,34 +144,26 @@ public class HistoryEpisode : INotifyPropertyChanged{
                 HasMissingAvailableItem(requestedSoftSubs, DownloadedSoftSubs, HistoryEpisodeAvailableSoftSubs));
     }
 
-    private static bool IsMissingAny(IEnumerable<string> requested, List<string> downloaded){
-        var requestedList = requested
-            .Where(item => !string.IsNullOrWhiteSpace(item))
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .ToList();
-
-        if (requestedList.Count == 0 || downloaded.Count == 0){
-            return false;
-        }
-
-        var downloadedSet = downloaded.ToHashSet(StringComparer.OrdinalIgnoreCase);
-        return requestedList.Any(item => !downloadedSet.Contains(item));
-    }
-
     private static bool HasMissingAvailableItem(IEnumerable<string> requested, List<string> downloaded, List<string> available){
         var requestedList = requested
             .Where(item => !string.IsNullOrWhiteSpace(item))
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToList();
 
-        if (requestedList.Count == 0 || downloaded.Count == 0 || available.Count == 0){
+        if (requestedList.Count == 0 ||
+            requestedList.Contains("none", StringComparer.OrdinalIgnoreCase) ||
+            downloaded.Count == 0 ||
+            available.Count == 0){
             return false;
         }
 
         var downloadedSet = downloaded.ToHashSet(StringComparer.OrdinalIgnoreCase);
         var availableSet = available.ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var requestedAvailableItems = requestedList.Contains("all", StringComparer.OrdinalIgnoreCase)
+            ? availableSet
+            : requestedList.Where(availableSet.Contains);
 
-        return requestedList.Any(item => !downloadedSet.Contains(item) && availableSet.Contains(item));
+        return requestedAvailableItems.Any(item => !downloadedSet.Contains(item));
     }
 
     private void NotifyDownloadStateChanged(){
@@ -212,11 +204,13 @@ public class HistoryEpisode : INotifyPropertyChanged{
 
     public void ToggleWasDownloaded(){
         WasDownloaded = !WasDownloaded;
+        ClearDownloadedMediaIfNotDownloaded();
         NotifyDownloadStateChanged();
     }
 
     public void ToggleWasDownloadedSeries(HistorySeries? series){
         WasDownloaded = !WasDownloaded;
+        ClearDownloadedMediaIfNotDownloaded();
         NotifyDownloadStateChanged();
 
         if (series?.Seasons != null){
@@ -228,6 +222,14 @@ public class HistoryEpisode : INotifyPropertyChanged{
         }
 
         CfgManager.UpdateHistoryFile();
+    }
+
+    private void ClearDownloadedMediaIfNotDownloaded(){
+        if (WasDownloaded)
+            return;
+
+        DownloadedDubLang.Clear();
+        DownloadedSoftSubs.Clear();
     }
 
     public async Task DownloadEpisodeDefault(){

@@ -360,9 +360,13 @@ public class HistorySeries : INotifyPropertyChanged{
 
         var requestedList = requested.ToList();
 
-        return requestedList.Contains("all")
+        if (requestedList.Contains("none", StringComparer.OrdinalIgnoreCase)){
+            return [];
+        }
+
+        return requestedList.Contains("all", StringComparer.OrdinalIgnoreCase)
             ? episode.HistoryEpisodeAvailableSoftSubs
-            : requestedList.Where(item => item != "none");
+            : requestedList;
     }
 
     public void SetFetchingData(bool fetchingData = true){

@@ -3097,7 +3097,7 @@ public class CrunchyrollManager{
     }
 
     public async Task DeAuthVideo(string currentMediaId, string videoToken, CrAuth authEndoint){
-        var deauthVideoToken = HttpClientReq.CreateRequestMessage($"https://cr-play-service.prd.crunchyrollsvc.com/v1/token/{currentMediaId}/{videoToken}/inactive", HttpMethod.Patch, true,
+        var deauthVideoToken = HttpClientReq.CreateRequestMessage($"https://cr-play-service.prd.crunchyrollsvc.com/playback/v1/token/{currentMediaId}/{videoToken}/inactive", HttpMethod.Patch, true,
             authEndoint.Token?.access_token, null);
         var deauthVideoTokenResponse = await HttpClientReq.Instance.SendHttpRequest(deauthVideoToken);
     }

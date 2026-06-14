@@ -20,7 +20,7 @@ public class SyncingHelper{
     public static async Task<(bool IsOk, int ErrorCode, double frameRate)> ExtractFrames(string videoPath, string outputDir, double offset, double duration){
         var ffmpegPath = CfgManager.PathFFMPEG;
         var arguments =
-            $"{CrunchyrollManager.Instance.CrunOptions.FfmpegHwAccelFlag}-ss {offset} -t {duration} -i \"{videoPath}\" -vf \"select='gt(scene,0.1)',showinfo\" -vsync vfr -frame_pts true \"{outputDir}\\frame%05d.jpg\"";
+            $"{CrunchyrollManager.Instance.CrunOptions.FfmpegHwAccelFlag}-ss {offset} -t {duration} -i \"{videoPath}\" -vf \"scale=256:144:force_original_aspect_ratio=decrease,pad=256:144:(ow-iw)/2:(oh-ih)/2,select='gt(scene,0.1)',showinfo\" -vsync vfr -frame_pts true \"{outputDir}\\frame%05d.jpg\"";
 
         var output = "";
 

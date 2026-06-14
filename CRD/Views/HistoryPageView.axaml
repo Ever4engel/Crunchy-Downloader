@@ -786,8 +786,27 @@
                                                                                 TextWrapping="NoWrap"
                                                                                 TextTrimming="CharacterEllipsis" />
 
-                                                                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center"
+                                                                            <StackPanel Orientation="Horizontal"
+                                                                                        VerticalAlignment="Center"
+                                                                                        HorizontalAlignment="Left"
+                                                                                        Background="Transparent"
                                                                                         IsVisible="{Binding HistoryEpisodeAvailableDubLang, Converter={StaticResource UiListHasElementsConverter}}">
+                                                                                <ToolTip.Tip>
+                                                                                    <Grid ColumnDefinitions="Auto,*" MaxWidth="600">
+                                                                                        <TextBlock Grid.Column="0" Text="Subs: " />
+                                                                                        <ui:HighlightingTextBlock
+                                                                                            Grid.Column="1"
+                                                                                            Items="{Binding HistoryEpisodeAvailableSoftSubs}"
+                                                                                            Series="{Binding $parent[ScrollViewer].((history:HistorySeries)DataContext)}"
+                                                                                            Season="{Binding $parent[controls:SettingsExpander].((history:HistorySeason)DataContext)}"
+                                                                                            StreamingService="Crunchyroll"
+                                                                                            CheckDubs="False"
+                                                                                            FontSize="12"
+                                                                                            Opacity="0.8"
+                                                                                            FontStyle="Italic"
+                                                                                            TextWrapping="Wrap" />
+                                                                                    </Grid>
+                                                                                </ToolTip.Tip>
                                                                                 <TextBlock FontStyle="Italic"
                                                                                            FontSize="12"
                                                                                            Opacity="0.8" Text="Dubs: ">

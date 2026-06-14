@@ -22,15 +22,17 @@ public class UiHistoryDownloadStatusConverter : IMultiValueConverter{
             return isTooltip ? "Mark as downloaded" : Brushes.Gray;
         }
 
+        var requestedDubs = Enumerable.Empty<string>();
+        var requestedSoftSubs = Enumerable.Empty<string>();
         var isPartial = false;
         if (CrunchyrollManager.Instance.CrunOptions.HistoryCheckPartialDownloads){
-            var requestedDubs = HistorySeries.GetEffectiveDubLang(series, season);
-            var requestedSoftSubs = HistorySeries.GetEffectiveSoftSubs(series, season, episode);
+            requestedDubs = HistorySeries.GetEffectiveDubLang(series, season);
+            requestedSoftSubs = HistorySeries.GetEffectiveSoftSubs(series, season, episode);
             isPartial = episode.IsPartiallyDownloaded(requestedDubs, requestedSoftSubs);
         }
 
         if (isTooltip){
-            return BuildTooltip(episode, isPartial);
+            return BuildTooltip(episode, requestedDubs, requestedSoftSubs, isPartial);
         }
 
         return isPartial ? new SolidColorBrush(Color.Parse("#f78c25")) : new SolidColorBrush(Color.Parse("#21a556"));
@@ -39,19 +41,62 @@ public class UiHistoryDownloadStatusConverter : IMultiValueConverter{
     public IList<object> ConvertBack(object value, Type[] targetTypes, object parameter, CultureInfo culture)
         => throw new NotImplementedException();
 
-    private static string BuildTooltip(HistoryEpisode episode, bool isPartial){
-        var lines = new List<string>{
-            isPartial ? "Downloaded with missing selected dubs/subs" : "Downloaded"
-        };
-
-        if (episode.DownloadedDubLang.Count > 0){
-            lines.Add($"Dubs: {string.Join(", ", episode.DownloadedDubLang)}");
+    private static string BuildTooltip(
+        HistoryEpisode episode,
+        IEnumerable<string> requestedDubs,
+        IEnumerable<string> requestedSoftSubs,
+        bool isPartial){
+        if (!isPartial){
+            return "Downloaded";
         }
 
-        if (episode.DownloadedSoftSubs.Count > 0){
-            lines.Add($"Subs: {string.Join(", ", episode.DownloadedSoftSubs)}");
+        var missingDubs = GetMissingLocales(
+            requestedDubs,
+            episode.DownloadedDubLang,
+            episode.HistoryEpisodeAvailableDubLang);
+        var missingSubs = GetMissingLocales(
+            requestedSoftSubs,
+            episode.DownloadedSoftSubs,
+            episode.HistoryEpisodeAvailableSoftSubs);
+        var lines = new List<string>{ "Downloaded, but missing:" };
+
+        if (missingDubs.Count > 0){
+            lines.Add($"Dubs: {string.Join(", ", missingDubs)}");
+        }
+
+        if (missingSubs.Count > 0){
+            lines.Add($"Subs: {string.Join(", ", missingSubs)}");
         }
 
         return string.Join(Environment.NewLine, lines);
+    }
+
+    private static List<string> GetMissingLocales(
+        IEnumerable<string> requested,
+        IEnumerable<string> downloaded,
+        IEnumerable<string> available){
+        var requestedList = requested
+            .Where(locale => !string.IsNullOrWhiteSpace(locale))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        if (requestedList.Count == 0 ||
+            requestedList.Contains("none", StringComparer.OrdinalIgnoreCase)){
+            return [];
+        }
+
+        var downloadedSet = downloaded.ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var availableList = available
+            .Where(locale => !string.IsNullOrWhiteSpace(locale))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        var requestedAvailableLocales = requestedList.Contains("all", StringComparer.OrdinalIgnoreCase)
+            ? availableList
+            : requestedList.Where(locale => availableList.Contains(locale, StringComparer.OrdinalIgnoreCase));
+
+        return requestedAvailableLocales
+            .Where(locale => !downloadedSet.Contains(locale))
+            .OrderBy(locale => locale, StringComparer.OrdinalIgnoreCase)
+            .ToList();
     }
 }
